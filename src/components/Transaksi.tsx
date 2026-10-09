@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Transaksi as TransaksiType, KATEGORI_BOSP } from '../types';
-import { getTransaksi, addTransaksi, deleteTransaksi, generateId, formatRupiah, generateNoBukti } from '../utils';
+import { getTransaksi, addTransaksi, deleteTransaksi, updateTransaksi, generateId, formatRupiah, generateNoBukti } from '../utils';
 
 export default function Transaksi() {
   const [transaksi, setTransaksi] = useState<TransaksiType[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'semua' | 'masuk' | 'keluar'>('semua');
   const [search, setSearch] = useState('');
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     tanggal: new Date().toISOString().split('T')[0],
     noBukti: '',
     uraian: '',
@@ -17,7 +18,10 @@ export default function Transaksi() {
     jumlah: '',
     jenis: 'keluar' as 'masuk' | 'keluar',
     keterangan: '',
-  });
+    penerima: '',
+  };
+
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     setTransaksi(getTransaksi());
@@ -26,31 +30,55 @@ export default function Transaksi() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newTransaksi: TransaksiType = {
-      id: generateId(),
-      tanggal: form.tanggal,
-      noBukti: form.noBukti,
-      uraian: form.uraian,
-      kategori: form.kategori,
-      kodeRekening: form.kodeRekening,
-      jumlah: parseFloat(form.jumlah) || 0,
-      jenis: form.jenis,
-      keterangan: form.keterangan,
-      createdAt: new Date().toISOString(),
-    };
-    addTransaksi(newTransaksi);
+    if (editId) {
+      updateTransaksi(editId, {
+        tanggal: form.tanggal,
+        noBukti: form.noBukti,
+        uraian: form.uraian,
+        kategori: form.kategori,
+        kodeRekening: form.kodeRekening,
+        jumlah: parseFloat(form.jumlah) || 0,
+        jenis: form.jenis,
+        keterangan: form.keterangan,
+        penerima: form.penerima,
+      });
+    } else {
+      const newTransaksi: TransaksiType = {
+        id: generateId(),
+        tanggal: form.tanggal,
+        noBukti: form.noBukti,
+        uraian: form.uraian,
+        kategori: form.kategori,
+        kodeRekening: form.kodeRekening,
+        jumlah: parseFloat(form.jumlah) || 0,
+        jenis: form.jenis,
+        keterangan: form.keterangan,
+        penerima: form.penerima,
+        statusBukti: false,
+        createdAt: new Date().toISOString(),
+      };
+      addTransaksi(newTransaksi);
+    }
     setTransaksi(getTransaksi());
     setShowForm(false);
+    setEditId(null);
+    setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') });
+  };
+
+  const handleEdit = (t: TransaksiType) => {
+    setEditId(t.id);
     setForm({
-      tanggal: new Date().toISOString().split('T')[0],
-      noBukti: generateNoBukti('TRX'),
-      uraian: '',
-      kategori: '',
-      kodeRekening: '',
-      jumlah: '',
-      jenis: 'keluar',
-      keterangan: '',
+      tanggal: t.tanggal,
+      noBukti: t.noBukti,
+      uraian: t.uraian,
+      kategori: t.kategori,
+      kodeRekening: t.kodeRekening,
+      jumlah: t.jumlah.toString(),
+      jenis: t.jenis,
+      keterangan: t.keterangan,
+      penerima: t.penerima,
     });
+    setShowForm(true);
   };
 
   const handleDelete = (id: string) => {
@@ -84,7 +112,7 @@ export default function Transaksi() {
           >Pengeluaran</button>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => { setShowForm(true); setEditId(null); setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') }); }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm"
         >
           <i className="fas fa-plus mr-2"></i>Tambah Transaksi
@@ -112,15 +140,17 @@ export default function Transaksi() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Tanggal</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">No. Bukti</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Uraian</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">Penerima</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Kategori</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-600">Jumlah</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-600">Bukti</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-600">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-400">
+                  <td colSpan={8} className="text-center py-8 text-gray-400">
                     <i className="fas fa-inbox text-3xl mb-2 block"></i>
                     Belum ada transaksi
                   </td>
@@ -134,6 +164,7 @@ export default function Transaksi() {
                       <div className="font-medium">{t.uraian}</div>
                       {t.keterangan && <div className="text-xs text-gray-400">{t.keterangan}</div>}
                     </td>
+                    <td className="px-4 py-3 text-sm">{t.penerima || '-'}</td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">{t.kategori}</span>
                     </td>
@@ -141,9 +172,25 @@ export default function Transaksi() {
                       {t.jenis === 'masuk' ? '+' : '-'}{formatRupiah(t.jumlah)}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700">
-                        <i className="fas fa-trash"></i>
-                      </button>
+                      {t.statusBukti ? (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          <i className="fas fa-check mr-1"></i>Ada
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs">
+                          Belum
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => handleEdit(t)} className="text-blue-500 hover:text-blue-700" title="Edit">
+                          <i className="fas fa-edit"></i>
+                        </button>
+                        <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700" title="Hapus">
+                          <i className="fas fa-trash"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -163,8 +210,8 @@ export default function Transaksi() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b flex items-center justify-between">
-              <h3 className="text-lg font-bold">Tambah Transaksi Baru</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-lg font-bold">{editId ? 'Edit Transaksi' : 'Tambah Transaksi Baru'}</h3>
+              <button onClick={() => { setShowForm(false); setEditId(null); }} className="text-gray-400 hover:text-gray-600">
                 <i className="fas fa-times text-xl"></i>
               </button>
             </div>
@@ -196,6 +243,10 @@ export default function Transaksi() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Uraian</label>
                 <input type="text" value={form.uraian} onChange={e => setForm({ ...form, uraian: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Deskripsi transaksi" required />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Penerima / Nama Pihak</label>
+                <input type="text" value={form.penerima} onChange={e => setForm({ ...form, penerima: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama penerima dana / toko / vendor" />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
@@ -218,9 +269,9 @@ export default function Transaksi() {
                 <textarea value={form.keterangan} onChange={e => setForm({ ...form, keterangan: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows={2} placeholder="Keterangan tambahan (opsional)"></textarea>
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditId(null); }} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Batal</button>
                 <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-                  <i className="fas fa-save mr-2"></i>Simpan
+                  <i className="fas fa-save mr-2"></i>{editId ? 'Update' : 'Simpan'}
                 </button>
               </div>
             </form>

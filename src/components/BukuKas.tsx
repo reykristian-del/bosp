@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah } from '../utils';
+import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -8,6 +8,7 @@ export default function BukuKas() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [saldoAwal, setSaldoAwal] = useState<number>(0);
   const [filterBulan, setFilterBulan] = useState('');
+  const pengaturan = getPengaturan();
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function BukuKas() {
   const exportExcel = () => {
     const data = [
       ['BUKU KAS UMUM'],
-      ['SMP NEGERI 1 TULANG BAWANG BARAT'],
+      [pengaturan.namaSekolah || 'SMP NEGERI 1 TULANG BAWANG BARAT'],
       [`Periode: ${filterBulan ? new Date(`${filterTahun}-${filterBulan}-01`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : `Tahun ${filterTahun}`}`],
       [],
       ['No', 'Tanggal', 'No. Bukti', 'Uraian', 'Kode Rek.', 'Pemasukan (Rp)', 'Pengeluaran (Rp)', 'Saldo (Rp)'],
@@ -124,7 +125,7 @@ export default function BukuKas() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b bg-gray-50">
           <h3 className="font-bold text-gray-800"><i className="fas fa-book mr-2"></i>Buku Kas Umum</h3>
-          <p className="text-xs text-gray-500 mt-1">SMP Negeri 1 Tulang Bawang Barat - Dana BOSP</p>
+          <p className="text-xs text-gray-500 mt-1">{pengaturan.namaSekolah || 'SMP Negeri 1 Tulang Bawang Barat'} - {pengaturan.sumberDana || 'Dana BOSP'}</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

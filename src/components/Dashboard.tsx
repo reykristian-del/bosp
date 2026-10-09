@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, saveSaldoAwal } from '../utils';
+import { getTransaksi, getSaldoAwal, formatRupiah, saveSaldoAwal, getPengaturan } from '../utils';
 
 export default function Dashboard() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [saldoAwal, setSaldoAwal] = useState<number>(0);
   const [showSaldoModal, setShowSaldoModal] = useState(false);
   const [inputSaldo, setInputSaldo] = useState('');
+  const pengaturan = getPengaturan();
 
   useEffect(() => {
     setTransaksi(getTransaksi());
@@ -35,15 +36,18 @@ export default function Dashboard() {
       return acc;
     }, {} as Record<string, number>);
 
+  const transaksiTanpaBukti = transaksi.filter(t => t.jenis === 'keluar' && !t.statusBukti).length;
+
   return (
     <div className="space-y-6">
       {/* Info Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold">Sistem Pembukuan Dana BOSP</h3>
-            <p className="text-blue-100 mt-1">SMP Negeri 1 Tulang Bawang Barat</p>
-            <p className="text-blue-200 text-sm mt-2">Tahun Anggaran {new Date().getFullYear()}</p>
+            <h3 className="text-2xl font-bold">{pengaturan.namaSekolah || 'SMP Negeri 1 Tulang Bawang Barat'}</h3>
+            <p className="text-blue-100 mt-1">Sistem Pembukuan Dana {pengaturan.sumberDana || 'BOSP'}</p>
+            <p className="text-blue-200 text-sm mt-2">Tahun Anggaran {pengaturan.tahunAnggaran || new Date().getFullYear()}</p>
+            {pengaturan.npsn && <p className="text-blue-200 text-xs mt-1">NPSN: {pengaturan.npsn}</p>}
           </div>
           <div className="text-right">
             <i className="fas fa-school text-5xl text-blue-200"></i>
@@ -108,6 +112,21 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Alert for transactions without bukti kas */}
+      {transaksiTanpaBukti > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <i className="fas fa-exclamation text-orange-600"></i>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-orange-800">
+              {transaksiTanpaBukti} transaksi pengeluaran belum memiliki bukti kas
+            </p>
+            <p className="text-xs text-orange-600">Segera buat bukti kas pengeluaran untuk kelengkapan administrasi</p>
+          </div>
+        </div>
+      )}
+
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Transaksi Terakhir */}
@@ -167,6 +186,23 @@ export default function Dashboard() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Info Pegawai */}
+      <div className="bg-white rounded-xl shadow-sm p-5">
+        <h3 className="font-bold text-gray-800 mb-3"><i className="fas fa-users mr-2 text-green-500"></i>Informasi Pegawai</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Kepala Sekolah</p>
+            <p className="font-medium text-gray-800">{pengaturan.kepalaSekolah || '(Belum diatur)'}</p>
+            {pengaturan.nipKepsek && <p className="text-xs text-gray-500">NIP: {pengaturan.nipKepsek}</p>}
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500">Bendahara</p>
+            <p className="font-medium text-gray-800">{pengaturan.bendahara || '(Belum diatur)'}</p>
+            {pengaturan.nipBendahara && <p className="text-xs text-gray-500">NIP: {pengaturan.nipBendahara}</p>}
           </div>
         </div>
       </div>

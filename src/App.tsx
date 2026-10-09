@@ -4,12 +4,15 @@ import Transaksi from './components/Transaksi';
 import BukuKas from './components/BukuKas';
 import BuktiKas from './components/BuktiKas';
 import Laporan from './components/Laporan';
+import Pengaturan from './components/Pengaturan';
+import { getPengaturan } from './utils';
 
-type Page = 'dashboard' | 'transaksi' | 'bukukas' | 'buktikas' | 'laporan';
+type Page = 'dashboard' | 'transaksi' | 'bukukas' | 'buktikas' | 'laporan' | 'pengaturan';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const pengaturan = getPengaturan();
 
   const renderPage = () => {
     switch (currentPage) {
@@ -23,6 +26,8 @@ function App() {
         return <BuktiKas />;
       case 'laporan':
         return <Laporan />;
+      case 'pengaturan':
+        return <Pengaturan />;
       default:
         return <Dashboard />;
     }
@@ -34,12 +39,13 @@ function App() {
     { id: 'bukukas' as Page, label: 'Buku Kas', icon: 'fa-book' },
     { id: 'buktikas' as Page, label: 'Bukti Kas', icon: 'fa-file-invoice' },
     { id: 'laporan' as Page, label: 'Laporan', icon: 'fa-file-excel' },
+    { id: 'pengaturan' as Page, label: 'Pengaturan', icon: 'fa-cog' },
   ];
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-blue-800 to-blue-900 text-white transition-all duration-300 flex flex-col`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gradient-to-b from-blue-800 to-blue-900 text-white transition-all duration-300 flex flex-col flex-shrink-0`}>
         <div className="p-4 border-b border-blue-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
@@ -47,14 +53,14 @@ function App() {
             </div>
             {sidebarOpen && (
               <div className="overflow-hidden">
-                <h1 className="text-sm font-bold leading-tight">SMP Negeri 1</h1>
-                <p className="text-xs text-blue-200">Tulang Bawang Barat</p>
-                <p className="text-xs text-yellow-300 font-semibold">Sistem BOSP</p>
+                <h1 className="text-sm font-bold leading-tight truncate">{pengaturan.namaSekolah || 'SMP Negeri 1'}</h1>
+                <p className="text-xs text-blue-200 truncate">{pengaturan.kecamatan || 'Tulang Bawang Barat'}</p>
+                <p className="text-xs text-yellow-300 font-semibold">Sistem BOSP {pengaturan.tahunAnggaran}</p>
               </div>
             )}
           </div>
         </div>
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2 overflow-y-auto">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -92,10 +98,17 @@ function App() {
               <p className="text-sm text-gray-500">Sistem Informasi Pembukuan Dana BOSP</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 hidden md:inline">
                 <i className="fas fa-calendar-alt mr-2"></i>
                 {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </span>
+              <button
+                onClick={() => setCurrentPage('pengaturan')}
+                className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center hover:bg-blue-200 transition-all"
+                title="Pengaturan"
+              >
+                <i className="fas fa-cog"></i>
+              </button>
             </div>
           </div>
         </header>

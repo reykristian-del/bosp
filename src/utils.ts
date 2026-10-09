@@ -1,9 +1,31 @@
-import { Transaksi, BuktiKasPengeluaran, SaldoAwal } from './types';
+import { Transaksi, BuktiKasPengeluaran, PengaturanSekolah } from './types';
 
 const TRANSAKSI_KEY = 'bosp_transaksi';
 const BUKTI_KAS_KEY = 'bosp_bukti_kas';
 const SALDO_KEY = 'bosp_saldo_awal';
+const PENGATURAN_KEY = 'bosp_pengaturan';
 
+// Default pengaturan
+const DEFAULT_PENGATURAN: PengaturanSekolah = {
+  namaSekolah: 'SMP NEGERI 1 TULANG BAWANG BARAT',
+  npsn: '',
+  alamat: '',
+  kelurahan: '',
+  kecamatan: 'Tulang Bawang Barat',
+  kabupaten: 'Tulang Bawang Barat',
+  provinsi: 'Lampung',
+  kodePos: '',
+  telepon: '',
+  email: '',
+  kepalaSekolah: '',
+  nipKepsek: '',
+  bendahara: '',
+  nipBendahara: '',
+  tahunAnggaran: new Date().getFullYear().toString(),
+  sumberDana: 'Dana BOSP',
+};
+
+// Transaksi
 export function getTransaksi(): Transaksi[] {
   const data = localStorage.getItem(TRANSAKSI_KEY);
   return data ? JSON.parse(data) : [];
@@ -19,11 +41,17 @@ export function addTransaksi(transaksi: Transaksi): void {
   saveTransaksi(list);
 }
 
+export function updateTransaksi(id: string, data: Partial<Transaksi>): void {
+  const list = getTransaksi().map(t => t.id === id ? { ...t, ...data } : t);
+  saveTransaksi(list);
+}
+
 export function deleteTransaksi(id: string): void {
   const list = getTransaksi().filter(t => t.id !== id);
   saveTransaksi(list);
 }
 
+// Bukti Kas
 export function getBuktiKas(): BuktiKasPengeluaran[] {
   const data = localStorage.getItem(BUKTI_KAS_KEY);
   return data ? JSON.parse(data) : [];
@@ -44,15 +72,30 @@ export function deleteBuktiKas(id: string): void {
   saveBuktiKas(list);
 }
 
-export function getSaldoAwal(): SaldoAwal {
+// Saldo Awal
+export function getSaldoAwal(): { tanggal: string; jumlah: number; keterangan: string } {
   const data = localStorage.getItem(SALDO_KEY);
   return data ? JSON.parse(data) : { tanggal: '', jumlah: 0, keterangan: '' };
 }
 
-export function saveSaldoAwal(saldo: SaldoAwal): void {
+export function saveSaldoAwal(saldo: { tanggal: string; jumlah: number; keterangan: string }): void {
   localStorage.setItem(SALDO_KEY, JSON.stringify(saldo));
 }
 
+// Pengaturan
+export function getPengaturan(): PengaturanSekolah {
+  const data = localStorage.getItem(PENGATURAN_KEY);
+  if (data) {
+    return { ...DEFAULT_PENGATURAN, ...JSON.parse(data) };
+  }
+  return DEFAULT_PENGATURAN;
+}
+
+export function savePengaturan(pengaturan: PengaturanSekolah): void {
+  localStorage.setItem(PENGATURAN_KEY, JSON.stringify(pengaturan));
+}
+
+// Utility functions
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }

@@ -8,11 +8,14 @@ export interface Transaksi {
   jumlah: number;
   jenis: 'masuk' | 'keluar';
   keterangan: string;
+  penerima: string;
+  statusBukti: boolean; // apakah sudah dibuatkan bukti kas
   createdAt: string;
 }
 
 export interface BuktiKasPengeluaran {
   id: string;
+  transaksiId: string; // referensi ke transaksi
   noBukti: string;
   tanggal: string;
   telahTerimaDari: string;
@@ -21,9 +24,8 @@ export interface BuktiKasPengeluaran {
   untukPembayaran: string;
   kategori: string;
   kodeRekening: string;
-  bendahara: string;
-  kepalaSekolah: string;
   items: BuktiItem[];
+  dokumenPendukung: string[];
   createdAt: string;
 }
 
@@ -35,10 +37,23 @@ export interface BuktiItem {
   jumlah: number;
 }
 
-export interface SaldoAwal {
-  tanggal: string;
-  jumlah: number;
-  keterangan: string;
+export interface PengaturanSekolah {
+  namaSekolah: string;
+  npsn: string;
+  alamat: string;
+  kelurahan: string;
+  kecamatan: string;
+  kabupaten: string;
+  provinsi: string;
+  kodePos: string;
+  telepon: string;
+  email: string;
+  kepalaSekolah: string;
+  nipKepsek: string;
+  bendahara: string;
+  nipBendahara: string;
+  tahunAnggaran: string;
+  sumberDana: string;
 }
 
 export const KATEGORI_BOSP = [
@@ -62,4 +77,16 @@ export const KODE_REKENING = [
   { kode: '5.2.01', nama: 'Belanja Modal Tanah' },
   { kode: '5.2.02', nama: 'Belanja Modal Peralatan dan Mesin' },
   { kode: '5.2.03', nama: 'Belanja Modal Gedung dan Bangunan' },
+];
+
+export const DOKUMEN_PENDUKUNG_OPTIONS = [
+  'Kwitansi',
+  'Nota/Faktur',
+  'Surat Pesanan',
+  'Berita Acara Serah Terima',
+  'Surat Tugas',
+  'Daftar Hadir',
+  'SPJ',
+  'Bukti Transfer',
+  'Dokumen Lainnya',
 ];

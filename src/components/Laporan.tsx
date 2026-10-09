@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getBuktiKas, getSaldoAwal, formatRupiah } from '../utils';
+import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } from 'docx';
@@ -8,6 +8,7 @@ import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, Width
 export default function Laporan() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [saldoAwal, setSaldoAwal] = useState<number>(0);
+  const pengaturan = getPengaturan();
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
   const [filterBulan, setFilterBulan] = useState('');
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'kategori' | 'bulanan'>('ringkasan');
@@ -56,7 +57,7 @@ export default function Laporan() {
     // Sheet 1: Ringkasan
     const ringkasanData = [
       ['LAPORAN REALISASI ANGGARAN DANA BOSP'],
-      ['SMP NEGERI 1 TULANG BAWANG BARAT'],
+      [pengaturan.namaSekolah || 'SMP NEGERI 1 TULANG BAWANG BARAT'],
       [`Tahun Anggaran ${filterTahun}${filterBulan ? ` - Bulan ${new Date(`${filterTahun}-${filterBulan}-01`).toLocaleDateString('id-ID', { month: 'long' })}` : ''}`],
       [],
       ['URAIAN', 'JUMLAH (Rp)'],
@@ -71,7 +72,7 @@ export default function Laporan() {
     // Sheet 2: Per Kategori
     const kategoriSheet = [
       ['LAPORAN PENGELUARAN PER KATEGORI'],
-      ['SMP NEGERI 1 TULANG BAWANG BARAT'],
+      [pengaturan.namaSekolah || 'SMP NEGERI 1 TULANG BAWANG BARAT'],
       [],
       ['No', 'Kategori', 'Jumlah Transaksi', 'Total (Rp)', 'Persentase (%)'],
       ...Object.entries(kategoriData).map(([kat, data], i) => [
@@ -90,7 +91,7 @@ export default function Laporan() {
     // Sheet 3: Per Bulan
     const bulanSheet = [
       ['LAPORAN TRANSAKSI PER BULAN'],
-      ['SMP NEGERI 1 TULANG BAWANG BARAT'],
+      [pengaturan.namaSekolah || 'SMP NEGERI 1 TULANG BAWANG BARAT'],
       [],
       ['No', 'Bulan', 'Pemasukan (Rp)', 'Pengeluaran (Rp)', 'Selisih (Rp)'],
       ...Object.entries(monthlyData).sort().map(([bulan, data], i) => [
@@ -107,7 +108,7 @@ export default function Laporan() {
     // Sheet 4: Detail Transaksi
     const detailData = [
       ['DETAIL TRANSAKSI DANA BOSP'],
-      ['SMP NEGERI 1 TULANG BAWANG BARAT'],
+      [pengaturan.namaSekolah || 'SMP NEGERI 1 TULANG BAWANG BARAT'],
       [],
       ['No', 'Tanggal', 'No. Bukti', 'Uraian', 'Kategori', 'Kode Rek.', 'Jenis', 'Jumlah (Rp)'],
       ...filtered.sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()).map((t, i) => [
@@ -137,8 +138,8 @@ export default function Laporan() {
         properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
         children: [
           new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "LAPORAN REALISASI ANGGARAN", bold: true, size: 28 })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "DANA BANTUAN OPERASIONAL SATUAN PENDIDIKAN (BOSP)", bold: true, size: 24 })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "SMP NEGERI 1 TULANG BAWANG BARAT", bold: true, size: 24 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `DANA ${pengaturan.sumberDana || 'BANTUAN OPERASIONAL SATUAN PENDIDIKAN (BOSP)'}`, bold: true, size: 24 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: pengaturan.namaSekolah || "SMP NEGERI 1 TULANG BAWANG BARAT", bold: true, size: 24 })] }),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: `Tahun Anggaran ${filterTahun}`, size: 22 })] }),
           new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: "A. RINGKASAN ANGGARAN", bold: true, size: 22 })] }),
           new Table({
