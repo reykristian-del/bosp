@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BuktiKasPengeluaran, BuktiItem, Transaksi } from '../types';
-import { getBuktiKas, addBuktiKas, deleteBuktiKas, getTransaksi, updateTransaksi, generateId, formatRupiah, terbilang, generateNoBukti, getPengaturan } from '../utils';
+import { getBuktiKas, addBuktiKas, deleteBuktiKas, getTransaksi, updateTransaksi, generateId, formatRupiah, terbilang, formatTanggalIndonesia, getPengaturan } from '../utils';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -30,7 +30,6 @@ export default function BuktiKas() {
   useEffect(() => {
     setBuktiList(getBuktiKas());
     setTransaksiList(getTransaksi());
-    setForm(f => ({ ...f, noBukti: generateNoBukti('BKP') }));
   }, []);
 
   // Filter transaksi yang belum dibuatkan bukti kas
@@ -41,9 +40,10 @@ export default function BuktiKas() {
 
   const selectTransaksi = (t: Transaksi) => {
     setSelectedTransaksi(t);
+    // No. Bukti BKP diambil dari No. Bukti transaksi
     setForm({
       tanggal: t.tanggal,
-      noBukti: generateNoBukti('BKP'),
+      noBukti: t.noBukti,
       telahTerimaDari: t.penerima || '',
       jumlahUang: t.jumlah.toString(),
       untukPembayaran: t.uraian,
@@ -120,7 +120,7 @@ export default function BuktiKas() {
     setSelectedTransaksi(null);
     setForm({
       tanggal: new Date().toISOString().split('T')[0],
-      noBukti: generateNoBukti('BKP'),
+      noBukti: '',
       telahTerimaDari: '',
       jumlahUang: '',
       untukPembayaran: '',
@@ -151,61 +151,203 @@ export default function BuktiKas() {
       sections: [{
         properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
         children: [
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: pengaturan.namaSekolah, bold: true, size: 24 })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: pengaturan.alamat, size: 18 })] }),
-          new Paragraph({ children: [] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "BUKTI KAS PENGELUARAN", bold: true, size: 28, underline: {} })] }),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: `No: ${bukti.noBukti}`, size: 20 })] }),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Tanggal", bold: true, size: 20 }),
-            new TextRun({ text: `: ${bukti.tanggal}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Telah terima dari", bold: true, size: 20 }),
-            new TextRun({ text: `: Bendahara ${pengaturan.namaSekolah}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Jumlah uang", bold: true, size: 20 }),
-            new TextRun({ text: `: ${formatRupiah(bukti.jumlahUang)}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Terbilang", bold: true, size: 20 }),
-            new TextRun({ text: `: ${bukti.terbilang} rupiah`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Untuk pembayaran", bold: true, size: 20 }),
-            new TextRun({ text: `: ${bukti.untukPembayaran}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Kategori", bold: true, size: 20 }),
-            new TextRun({ text: `: ${bukti.kategori}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { after: 80 }, children: [
-            new TextRun({ text: "Kode Rekening", bold: true, size: 20 }),
-            new TextRun({ text: `: ${bukti.kodeRekening}`, size: 20 }),
-          ]}),
-          new Paragraph({ spacing: { before: 200, after: 100 }, children: [new TextRun({ text: "Rincian Pengeluaran:", bold: true, size: 22 })] }),
+          // Judul BKP tanpa KOP
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [new TextRun({ text: "BUKTI KAS PENGELUARAN", bold: true, size: 28, underline: {} })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: `Nomor: ${bukti.noBukti}`, bold: true, size: 22 })] }),
+          
+          // Informasi BKP dalam format tabel rapi
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "No", bold: true, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Uraian", bold: true, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Vol", bold: true, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Satuan", bold: true, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Harga", bold: true, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Jumlah", bold: true, size: 18 })] })] }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Tanggal", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    width: { size: 5, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    width: { size: 70, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: formatTanggalIndonesia(bukti.tanggal), size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Telah terima dari", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: bukti.telahTerimaDari, size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Jumlah uang", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: formatRupiah(bukti.jumlahUang), size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Terbilang", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: `${bukti.terbilang} rupiah`, italics: true, size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Untuk pembayaran", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: bukti.untukPembayaran, size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Kategori", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: bukti.kategori, size: 20 })] })] 
+                  }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Kode Rekening", bold: true, size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: ":", size: 20 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                    children: [new Paragraph({ children: [new TextRun({ text: bukti.kodeRekening, size: 20 })] })] 
+                  }),
+                ]
+              }),
+            ]
+          }),
+          
+          // Tabel Rincian Pengeluaran
+          new Paragraph({ spacing: { before: 300, after: 100 }, children: [new TextRun({ text: "Rincian Pengeluaran:", bold: true, size: 22 })] }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 8, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "No", bold: true, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 42, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Uraian", bold: true, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Volume", bold: true, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Satuan", bold: true, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Harga Satuan", bold: true, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Jumlah", bold: true, size: 18 })] })] 
+                  }),
                 ]
               }),
               ...bukti.items.map((item, i) => new TableRow({
                 children: [
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(i + 1), size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ children: [new TextRun({ text: item.uraian, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.volume, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.satuan, size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(item.hargaSatuan), size: 18 })] })] }),
-                  new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(item.jumlah), size: 18 })] })] }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 8, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(i + 1), size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 42, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: item.uraian, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.volume, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.satuan, size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(item.hargaSatuan), size: 18 })] })] 
+                  }),
+                  new TableCell({ 
+                    borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder },
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(item.jumlah), size: 18 })] })] 
+                  }),
                 ]
               })),
             ]
@@ -232,7 +374,7 @@ export default function BuktiKas() {
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `NIP. ${pengaturan.nipKepsek || '...........................'}`, size: 18 })] }),
                   ]}),
                   new TableCell({ borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }, width: { size: 50, type: WidthType.PERCENTAGE }, children: [
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${pengaturan.kecamatan || 'Tulang Bawang Barat'}, ${bukti.tanggal}`, size: 18 })] }),
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${pengaturan.kecamatan || 'Tulang Bawang Barat'}, ${formatTanggalIndonesia(bukti.tanggal)}`, size: 18 })] }),
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Bendahara", size: 18 })] }),
                     new Paragraph({ spacing: { before: 800 }, alignment: AlignmentType.CENTER, children: [new TextRun({ text: pengaturan.bendahara || '(...........................)', size: 20, bold: true })] }),
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `NIP. ${pengaturan.nipBendahara || '...........................'}`, size: 18 })] }),
@@ -349,49 +491,85 @@ export default function BuktiKas() {
               </div>
             </div>
             <div className="p-8" id="bukti-print">
-              <div className="text-center mb-4 border-b pb-3">
-                <h2 className="text-base font-bold">{pengaturan.namaSekolah}</h2>
-                <p className="text-xs text-gray-600">{pengaturan.alamat}{pengaturan.kecamatan ? `, ${pengaturan.kecamatan}` : ''}</p>
-                <h3 className="text-lg font-bold mt-3 underline">BUKTI KAS PENGELUARAN</h3>
-                <p className="text-sm">No: {showPreview.noBukti}</p>
+              {/* Judul BKP tanpa KOP */}
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-bold underline">BUKTI KAS PENGELUARAN</h3>
+                <p className="text-sm font-semibold mt-2">Nomor: {showPreview.noBukti}</p>
               </div>
-              <div className="space-y-1.5 text-sm mb-4">
-                <p><span className="font-semibold w-40 inline-block">Tanggal</span>: {showPreview.tanggal}</p>
-                <p><span className="font-semibold w-40 inline-block">Telah terima dari</span>: Bendahara {pengaturan.namaSekolah}</p>
-                <p><span className="font-semibold w-40 inline-block">Jumlah uang</span>: {formatRupiah(showPreview.jumlahUang)}</p>
-                <p><span className="font-semibold w-40 inline-block">Terbilang</span>: <em>{showPreview.terbilang} rupiah</em></p>
-                <p><span className="font-semibold w-40 inline-block">Untuk pembayaran</span>: {showPreview.untukPembayaran}</p>
-                <p><span className="font-semibold w-40 inline-block">Kategori</span>: {showPreview.kategori}</p>
-                <p><span className="font-semibold w-40 inline-block">Kode Rekening</span>: {showPreview.kodeRekening}</p>
-              </div>
-              <table className="w-full text-sm border-collapse mb-4">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border px-2 py-2 w-8">No</th>
-                    <th className="border px-2 py-2">Uraian</th>
-                    <th className="border px-2 py-2 w-16">Vol</th>
-                    <th className="border px-2 py-2 w-16">Satuan</th>
-                    <th className="border px-2 py-2 w-28">Harga Satuan</th>
-                    <th className="border px-2 py-2 w-28">Jumlah</th>
-                  </tr>
-                </thead>
+              
+              {/* Informasi BKP dalam format tabel rapi */}
+              <table className="w-full text-sm mb-6">
                 <tbody>
-                  {showPreview.items.map((item, i) => (
-                    <tr key={i}>
-                      <td className="border px-2 py-2 text-center">{i + 1}</td>
-                      <td className="border px-2 py-2">{item.uraian}</td>
-                      <td className="border px-2 py-2 text-center">{item.volume}</td>
-                      <td className="border px-2 py-2 text-center">{item.satuan}</td>
-                      <td className="border px-2 py-2 text-right">{formatRupiah(item.hargaSatuan)}</td>
-                      <td className="border px-2 py-2 text-right">{formatRupiah(item.jumlah)}</td>
-                    </tr>
-                  ))}
-                  <tr className="font-bold bg-gray-50">
-                    <td colSpan={5} className="border px-2 py-2 text-right">Total</td>
-                    <td className="border px-2 py-2 text-right">{formatRupiah(showPreview.items.reduce((s, i) => s + i.jumlah, 0))}</td>
+                  <tr>
+                    <td className="py-1 font-semibold w-40 align-top">Tanggal</td>
+                    <td className="py-1 w-4 align-top">:</td>
+                    <td className="py-1 align-top">{formatTanggalIndonesia(showPreview.tanggal)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Telah terima dari</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top">{showPreview.telahTerimaDari}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Jumlah uang</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top">{formatRupiah(showPreview.jumlahUang)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Terbilang</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top italic">{showPreview.terbilang} rupiah</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Untuk pembayaran</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top">{showPreview.untukPembayaran}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Kategori</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top">{showPreview.kategori}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold align-top">Kode Rekening</td>
+                    <td className="py-1 align-top">:</td>
+                    <td className="py-1 align-top">{showPreview.kodeRekening}</td>
                   </tr>
                 </tbody>
               </table>
+              
+              {/* Tabel Rincian Pengeluaran */}
+              <div className="mb-4">
+                <p className="font-bold text-sm mb-2">Rincian Pengeluaran:</p>
+                <table className="w-full text-sm border-collapse border border-gray-400">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-gray-400 px-2 py-2 text-center w-12">No</th>
+                      <th className="border border-gray-400 px-2 py-2 text-center">Uraian</th>
+                      <th className="border border-gray-400 px-2 py-2 text-center w-20">Volume</th>
+                      <th className="border border-gray-400 px-2 py-2 text-center w-20">Satuan</th>
+                      <th className="border border-gray-400 px-2 py-2 text-center w-32">Harga Satuan</th>
+                      <th className="border border-gray-400 px-2 py-2 text-center w-32">Jumlah</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {showPreview.items.map((item, i) => (
+                      <tr key={i}>
+                        <td className="border border-gray-400 px-2 py-2 text-center">{i + 1}</td>
+                        <td className="border border-gray-400 px-2 py-2">{item.uraian}</td>
+                        <td className="border border-gray-400 px-2 py-2 text-center">{item.volume}</td>
+                        <td className="border border-gray-400 px-2 py-2 text-center">{item.satuan}</td>
+                        <td className="border border-gray-400 px-2 py-2 text-right">{formatRupiah(item.hargaSatuan)}</td>
+                        <td className="border border-gray-400 px-2 py-2 text-right">{formatRupiah(item.jumlah)}</td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold bg-gray-50">
+                      <td colSpan={5} className="border border-gray-400 px-2 py-2 text-right">Total</td>
+                      <td className="border border-gray-400 px-2 py-2 text-right">{formatRupiah(showPreview.items.reduce((s, i) => s + i.jumlah, 0))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               {showPreview.dokumenPendukung.length > 0 && (
                 <div className="mb-4">
                   <p className="font-semibold text-sm mb-1">Dokumen Pendukung:</p>
@@ -409,7 +587,7 @@ export default function BuktiKas() {
                   <p className="text-xs">NIP. {pengaturan.nipKepsek || '...........................'}</p>
                 </div>
                 <div className="text-center">
-                  <p>{pengaturan.kecamatan || 'Tulang Bawang Barat'}, {showPreview.tanggal}</p>
+                  <p>{pengaturan.kecamatan || 'Tulang Bawang Barat'}, {formatTanggalIndonesia(showPreview.tanggal)}</p>
                   <p>Bendahara</p>
                   <div className="h-16"></div>
                   <p className="font-bold underline">{pengaturan.bendahara || '(...........................)'}</p>

@@ -152,6 +152,23 @@ export function formatTanggal(tanggal: string): string {
   });
 }
 
+// Format tanggal Indonesia: DD-MM-YYYY
+export function formatTanggalIndonesia(tanggal: string): string {
+  if (!tanggal) return '-';
+  // Handle format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) {
+    const [year, month, day] = tanggal.split('-');
+    return `${day}-${month}-${year}`;
+  }
+  // Handle Date object atau ISO string
+  const date = new Date(tanggal);
+  if (isNaN(date.getTime())) return tanggal;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 export function terbilang(angka: number): string {
   const satuan = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
   
