@@ -6,6 +6,7 @@ export interface Transaksi {
   kategori: string;
   kodeRekening: string;
   jumlah: number;
+  pajak?: number; // pajak jika ada
   jenis: 'masuk' | 'keluar';
   keterangan: string;
   penerima: string;
@@ -31,10 +32,12 @@ export interface BuktiKasPengeluaran {
 }
 
 export interface BuktiItem {
+  kodeRekening: string;
   uraian: string;
   volume: string;
   satuan: string;
   hargaSatuan: number;
+  pajak?: number; // pajak per item jika ada
   jumlah: number;
 }
 

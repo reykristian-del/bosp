@@ -21,6 +21,7 @@ export default function Transaksi() {
     kategori: '',
     kodeRekening: '',
     jumlah: '',
+    pajak: '',
     jenis: 'keluar' as 'masuk' | 'keluar',
     keterangan: '',
     penerima: '',
@@ -43,6 +44,7 @@ export default function Transaksi() {
         kategori: form.kategori,
         kodeRekening: form.kodeRekening,
         jumlah: parseFloat(form.jumlah) || 0,
+        pajak: parseFloat(form.pajak) || 0,
         jenis: form.jenis,
         keterangan: form.keterangan,
         penerima: form.penerima,
@@ -56,6 +58,7 @@ export default function Transaksi() {
         kategori: form.kategori,
         kodeRekening: form.kodeRekening,
         jumlah: parseFloat(form.jumlah) || 0,
+        pajak: parseFloat(form.pajak) || 0,
         jenis: form.jenis,
         keterangan: form.keterangan,
         penerima: form.penerima,
@@ -79,6 +82,7 @@ export default function Transaksi() {
       kategori: t.kategori,
       kodeRekening: t.kodeRekening,
       jumlah: t.jumlah.toString(),
+      pajak: (t.pajak || 0).toString(),
       jenis: t.jenis,
       keterangan: t.keterangan,
       penerima: t.penerima,
@@ -105,6 +109,7 @@ export default function Transaksi() {
         'Kode Rekening': '5.1.02.01',
         'Jenis': 'keluar',
         'Jumlah': 1500000,
+        'Pajak': 0,
         'Penerima': 'Toko Makmur Jaya',
         'Keterangan': 'Pembelian kertas, tinta, dll'
       },
@@ -116,8 +121,9 @@ export default function Transaksi() {
         'Kode Rekening': '5.1.02.02',
         'Jenis': 'keluar',
         'Jumlah': 5000000,
+        'Pajak': 250000,
         'Penerima': 'Bendahara Sekolah',
-        'Keterangan': 'Honor 5 guru'
+        'Keterangan': 'Honor 5 guru, PPh 21'
       },
       {
         'Tanggal': '2026-02-01',
@@ -127,6 +133,7 @@ export default function Transaksi() {
         'Kode Rekening': '5.1.01',
         'Jenis': 'masuk',
         'Jumlah': 50000000,
+        'Pajak': 0,
         'Penerima': 'SMP Negeri 1 Tulang Bawang Barat',
         'Keterangan': 'Dana BOSP Triwulan I TA 2026'
       }
@@ -144,6 +151,7 @@ export default function Transaksi() {
       { wch: 15 }, // Kode Rekening
       { wch: 10 }, // Jenis
       { wch: 15 }, // Jumlah
+      { wch: 15 }, // Pajak
       { wch: 30 }, // Penerima
       { wch: 30 }, // Keterangan
     ];
@@ -167,8 +175,9 @@ export default function Transaksi() {
       ['6. Kategori - Pilih dari daftar berikut:'],
       ...KATEGORI_BOSP.map(k => ['   - ' + k]),
       ['7. Kode Rekening - Contoh: 5.1.02.01'],
-      ['8. Penerima - Nama pihak yang menerima/memberi dana'],
-      ['9. Keterangan - Catatan tambahan'],
+      ['8. Pajak - Jumlah pajak (PPN/PPh) jika ada, isi 0 jika tidak ada'],
+      ['9. Penerima - Nama pihak yang menerima/memberi dana'],
+      ['10. Keterangan - Catatan tambahan'],
       [''],
       ['CATATAN PENTING:'],
       ['- Baris pertama adalah header, jangan dihapus'],
@@ -222,6 +231,7 @@ export default function Transaksi() {
           kodeRekening: row['Kode Rekening'] || row['kodeRekening'] || '',
           jenis: (row['Jenis'] || row['jenis'] || '').toString().toLowerCase(),
           jumlah: parseExcelNumber(row['Jumlah'] || row['jumlah']),
+          pajak: parseExcelNumber(row['Pajak'] || row['pajak']),
           penerima: row['Penerima'] || row['penerima'] || '',
           keterangan: row['Keterangan'] || row['keterangan'] || '',
         }));
@@ -442,9 +452,15 @@ export default function Transaksi() {
                   <input type="text" value={form.kodeRekening} onChange={e => setForm({ ...form, kodeRekening: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Contoh: 5.1.02.01" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
-                <input type="number" value={form.jumlah} onChange={e => setForm({ ...form, jumlah: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" required min="0" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah (Rp)</label>
+                  <input type="number" value={form.jumlah} onChange={e => setForm({ ...form, jumlah: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" required min="0" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pajak (Rp) <span className="text-xs text-gray-400">(opsional)</span></label>
+                  <input type="number" value={form.pajak} onChange={e => setForm({ ...form, pajak: e.target.value })} className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" min="0" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>

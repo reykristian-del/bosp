@@ -264,6 +264,7 @@ export function validateImportData(data: any[]): { valid: any[]; invalid: any[] 
         kategori: row.kategori || 'Biaya Lainnya',
         kodeRekening: row.kodeRekening || '',
         jumlah: row.jumlah,
+        pajak: row.pajak || 0,
         jenis: row.jenis,
         keterangan: row.keterangan || '',
         penerima: row.penerima || '',
