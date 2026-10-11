@@ -5,6 +5,39 @@ const BUKTI_KAS_KEY = 'bosp_bukti_kas';
 const SALDO_KEY = 'bosp_saldo_awal';
 const PENGATURAN_KEY = 'bosp_pengaturan';
 
+// Safe localStorage wrapper - mencegah crash jika localStorage diblokir
+const safeStorage = {
+  getItem(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn('localStorage tidak tersedia:', e);
+      return null;
+    }
+  },
+  setItem(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn('Gagal menyimpan ke localStorage:', e);
+    }
+  },
+  removeItem(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('Gagal menghapus dari localStorage:', e);
+    }
+  },
+  clear(): void {
+    try {
+      localStorage.clear();
+    } catch (e) {
+      console.warn('Gagal mengosongkan localStorage:', e);
+    }
+  }
+};
+
 // Default pengaturan
 const DEFAULT_PENGATURAN: PengaturanSekolah = {
   namaSekolah: 'SMP NEGERI 1 TULANG BAWANG BARAT',
@@ -27,12 +60,12 @@ const DEFAULT_PENGATURAN: PengaturanSekolah = {
 
 // Transaksi
 export function getTransaksi(): Transaksi[] {
-  const data = localStorage.getItem(TRANSAKSI_KEY);
+  const data = safeStorage.getItem(TRANSAKSI_KEY);
   return data ? JSON.parse(data) : [];
 }
 
 export function saveTransaksi(transaksi: Transaksi[]): void {
-  localStorage.setItem(TRANSAKSI_KEY, JSON.stringify(transaksi));
+  safeStorage.setItem(TRANSAKSI_KEY, JSON.stringify(transaksi));
 }
 
 export function addTransaksi(transaksi: Transaksi): void {
@@ -53,12 +86,12 @@ export function deleteTransaksi(id: string): void {
 
 // Bukti Kas
 export function getBuktiKas(): BuktiKasPengeluaran[] {
-  const data = localStorage.getItem(BUKTI_KAS_KEY);
+  const data = safeStorage.getItem(BUKTI_KAS_KEY);
   return data ? JSON.parse(data) : [];
 }
 
 export function saveBuktiKas(bukti: BuktiKasPengeluaran[]): void {
-  localStorage.setItem(BUKTI_KAS_KEY, JSON.stringify(bukti));
+  safeStorage.setItem(BUKTI_KAS_KEY, JSON.stringify(bukti));
 }
 
 export function addBuktiKas(bukti: BuktiKasPengeluaran): void {
@@ -74,17 +107,17 @@ export function deleteBuktiKas(id: string): void {
 
 // Saldo Awal
 export function getSaldoAwal(): { tanggal: string; jumlah: number; keterangan: string } {
-  const data = localStorage.getItem(SALDO_KEY);
+  const data = safeStorage.getItem(SALDO_KEY);
   return data ? JSON.parse(data) : { tanggal: '', jumlah: 0, keterangan: '' };
 }
 
 export function saveSaldoAwal(saldo: { tanggal: string; jumlah: number; keterangan: string }): void {
-  localStorage.setItem(SALDO_KEY, JSON.stringify(saldo));
+  safeStorage.setItem(SALDO_KEY, JSON.stringify(saldo));
 }
 
 // Pengaturan
 export function getPengaturan(): PengaturanSekolah {
-  const data = localStorage.getItem(PENGATURAN_KEY);
+  const data = safeStorage.getItem(PENGATURAN_KEY);
   if (data) {
     return { ...DEFAULT_PENGATURAN, ...JSON.parse(data) };
   }
@@ -92,7 +125,7 @@ export function getPengaturan(): PengaturanSekolah {
 }
 
 export function savePengaturan(pengaturan: PengaturanSekolah): void {
-  localStorage.setItem(PENGATURAN_KEY, JSON.stringify(pengaturan));
+  safeStorage.setItem(PENGATURAN_KEY, JSON.stringify(pengaturan));
 }
 
 // Utility functions

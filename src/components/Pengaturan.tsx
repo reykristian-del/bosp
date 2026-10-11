@@ -17,19 +17,35 @@ export default function Pengaturan() {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const safeGetItem = (key: string): string | null => {
+    try { return localStorage.getItem(key); } catch { return null; }
+  };
+  const safeSetItem = (key: string, value: string) => {
+    try { localStorage.setItem(key, value); } catch {}
+  };
+  const safeClear = () => {
+    try { localStorage.clear(); } catch {}
+  };
+  const safeStringLength = (): number => {
+    try { return JSON.stringify(localStorage).length; } catch { return 0; }
+  };
+  const safeKeyCount = (): number => {
+    try { return Object.keys(localStorage).length; } catch { return 0; }
+  };
+
   const handleReset = () => {
     if (confirm('Apakah Anda yakin ingin mereset semua data? Tindakan ini tidak dapat dibatalkan!')) {
-      localStorage.clear();
+      safeClear();
       window.location.reload();
     }
   };
 
   const exportDatabase = () => {
     const data = {
-      transaksi: localStorage.getItem('bosp_transaksi'),
-      bukti_kas: localStorage.getItem('bosp_bukti_kas'),
-      saldo_awal: localStorage.getItem('bosp_saldo_awal'),
-      pengaturan: localStorage.getItem('bosp_pengaturan'),
+      transaksi: safeGetItem('bosp_transaksi'),
+      bukti_kas: safeGetItem('bosp_bukti_kas'),
+      saldo_awal: safeGetItem('bosp_saldo_awal'),
+      pengaturan: safeGetItem('bosp_pengaturan'),
       exportDate: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -48,10 +64,10 @@ export default function Pengaturan() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.transaksi) localStorage.setItem('bosp_transaksi', data.transaksi);
-        if (data.bukti_kas) localStorage.setItem('bosp_bukti_kas', data.bukti_kas);
-        if (data.saldo_awal) localStorage.setItem('bosp_saldo_awal', data.saldo_awal);
-        if (data.pengaturan) localStorage.setItem('bosp_pengaturan', data.pengaturan);
+        if (data.transaksi) safeSetItem('bosp_transaksi', data.transaksi);
+        if (data.bukti_kas) safeSetItem('bosp_bukti_kas', data.bukti_kas);
+        if (data.saldo_awal) safeSetItem('bosp_saldo_awal', data.saldo_awal);
+        if (data.pengaturan) safeSetItem('bosp_pengaturan', data.pengaturan);
         alert('Data berhasil diimpor! Halaman akan dimuat ulang.');
         window.location.reload();
       } catch {
@@ -273,19 +289,19 @@ export default function Pengaturan() {
                 <h5 className="font-medium text-gray-700 mb-3">Statistik Penyimpanan</h5>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">{JSON.parse(localStorage.getItem('bosp_transaksi') || '[]').length}</p>
+                    <p className="text-2xl font-bold text-blue-600">{JSON.parse(safeGetItem('bosp_transaksi') || '[]').length}</p>
                     <p className="text-xs text-gray-500">Transaksi</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">{JSON.parse(localStorage.getItem('bosp_bukti_kas') || '[]').length}</p>
+                    <p className="text-2xl font-bold text-green-600">{JSON.parse(safeGetItem('bosp_bukti_kas') || '[]').length}</p>
                     <p className="text-xs text-gray-500">Bukti Kas</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-purple-600">{(JSON.stringify(localStorage).length / 1024).toFixed(1)} KB</p>
+                    <p className="text-2xl font-bold text-purple-600">{(safeStringLength() / 1024).toFixed(1)} KB</p>
                     <p className="text-xs text-gray-500">Ukuran Data</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-orange-600">{Object.keys(localStorage).length}</p>
+                    <p className="text-2xl font-bold text-orange-600">{safeKeyCount()}</p>
                     <p className="text-xs text-gray-500">Total Keys</p>
                   </div>
                 </div>
