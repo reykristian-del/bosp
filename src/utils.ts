@@ -177,3 +177,86 @@ export function generateNoBukti(prefix: string = 'BKP'): string {
   }).length + 1;
   return `${prefix}/${String(count).padStart(3, '0')}/${month}/${year}`;
 }
+
+// Import Excel functions
+export function parseExcelDate(dateValue: any): string {
+  if (!dateValue) return '';
+  
+  // Jika sudah string format YYYY-MM-DD
+  if (typeof dateValue === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      return dateValue;
+    }
+    // Format DD/MM/YYYY atau DD-MM-YYYY
+    const match = dateValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (match) {
+      const [, day, month, year] = match;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+  }
+  
+  // Jika number (Excel date serial)
+  if (typeof dateValue === 'number') {
+    const date = new Date((dateValue - 25569) * 86400 * 1000);
+    return date.toISOString().split('T')[0];
+  }
+  
+  // Jika Date object
+  if (dateValue instanceof Date) {
+    return dateValue.toISOString().split('T')[0];
+  }
+  
+  return '';
+}
+
+export function parseExcelNumber(value: any): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    // Hapus format Rupiah (Rp, titik sebagai pemisah ribuan, koma sebagai desimal)
+    const cleaned = value
+      .replace(/Rp\s?/gi, '')
+      .replace(/\./g, '')
+      .replace(/,/g, '.')
+      .replace(/\s/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  }
+  return 0;
+}
+
+export function validateImportData(data: any[]): { valid: any[]; invalid: any[] } {
+  const valid: any[] = [];
+  const invalid: any[] = [];
+  
+  data.forEach((row, index) => {
+    const errors: string[] = [];
+    
+    if (!row.tanggal) errors.push('Tanggal kosong');
+    if (!row.uraian) errors.push('Uraian kosong');
+    if (!row.jumlah || row.jumlah <= 0) errors.push('Jumlah tidak valid');
+    if (!row.jenis || !['masuk', 'keluar'].includes(row.jenis)) {
+      errors.push('Jenis harus "masuk" atau "keluar"');
+    }
+    
+    if (errors.length === 0) {
+      valid.push({
+        id: generateId(),
+        tanggal: row.tanggal,
+        noBukti: row.noBukti || generateNoBukti('TRX'),
+        uraian: row.uraian,
+        kategori: row.kategori || 'Biaya Lainnya',
+        kodeRekening: row.kodeRekening || '',
+        jumlah: row.jumlah,
+        jenis: row.jenis,
+        keterangan: row.keterangan || '',
+        penerima: row.penerima || '',
+        statusBukti: false,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      invalid.push({ row: index + 2, data: row, errors });
+    }
+  });
+  
+  return { valid, invalid };
+}

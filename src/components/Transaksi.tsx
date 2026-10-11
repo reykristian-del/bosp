@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Transaksi as TransaksiType, KATEGORI_BOSP } from '../types';
-import { getTransaksi, addTransaksi, deleteTransaksi, updateTransaksi, generateId, formatRupiah, generateNoBukti } from '../utils';
+import { getTransaksi, addTransaksi, deleteTransaksi, updateTransaksi, generateId, formatRupiah, generateNoBukti, parseExcelDate, parseExcelNumber, validateImportData, saveTransaksi } from '../utils';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 export default function Transaksi() {
   const [transaksi, setTransaksi] = useState<TransaksiType[]>([]);
@@ -8,6 +10,9 @@ export default function Transaksi() {
   const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'semua' | 'masuk' | 'keluar'>('semua');
   const [search, setSearch] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importData, setImportData] = useState<{ valid: any[]; invalid: any[] } | null>(null);
+  const [importFileName, setImportFileName] = useState('');
 
   const emptyForm = {
     tanggal: new Date().toISOString().split('T')[0],
@@ -88,6 +93,169 @@ export default function Transaksi() {
     }
   };
 
+  // Download Template Excel
+  const downloadTemplate = () => {
+    // Buat data contoh
+    const sampleData = [
+      {
+        'Tanggal': '2026-01-15',
+        'No. Bukti': 'TRX/001/01/2026',
+        'Uraian': 'Pembelian ATK untuk kegiatan sekolah',
+        'Kategori': 'Pengelolaan Sekolah',
+        'Kode Rekening': '5.1.02.01',
+        'Jenis': 'keluar',
+        'Jumlah': 1500000,
+        'Penerima': 'Toko Makmur Jaya',
+        'Keterangan': 'Pembelian kertas, tinta, dll'
+      },
+      {
+        'Tanggal': '2026-01-20',
+        'No. Bukti': 'TRX/002/01/2026',
+        'Uraian': 'Pembayaran honor guru bulan Januari',
+        'Kategori': 'Pembayaran Honor',
+        'Kode Rekening': '5.1.02.02',
+        'Jenis': 'keluar',
+        'Jumlah': 5000000,
+        'Penerima': 'Bendahara Sekolah',
+        'Keterangan': 'Honor 5 guru'
+      },
+      {
+        'Tanggal': '2026-02-01',
+        'No. Bukti': 'TRX/003/02/2026',
+        'Uraian': 'Pencairan Dana BOSP Triwulan I',
+        'Kategori': 'Biaya Lainnya',
+        'Kode Rekening': '5.1.01',
+        'Jenis': 'masuk',
+        'Jumlah': 50000000,
+        'Penerima': 'SMP Negeri 1 Tulang Bawang Barat',
+        'Keterangan': 'Dana BOSP Triwulan I TA 2026'
+      }
+    ];
+
+    // Buat worksheet
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Set lebar kolom
+    ws['!cols'] = [
+      { wch: 12 }, // Tanggal
+      { wch: 20 }, // No. Bukti
+      { wch: 40 }, // Uraian
+      { wch: 30 }, // Kategori
+      { wch: 15 }, // Kode Rekening
+      { wch: 10 }, // Jenis
+      { wch: 15 }, // Jumlah
+      { wch: 30 }, // Penerima
+      { wch: 30 }, // Keterangan
+    ];
+
+    // Buat workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Format Import');
+
+    // Tambah sheet panduan
+    const panduanData = [
+      ['PANDUAN IMPORT TRANSAKSI'],
+      [''],
+      ['KOLOM WAJIB:'],
+      ['1. Tanggal - Format: YYYY-MM-DD (contoh: 2026-01-15)'],
+      ['2. Uraian - Deskripsi transaksi'],
+      ['3. Jenis - Harus "masuk" atau "keluar" (huruf kecil)'],
+      ['4. Jumlah - Angka tanpa format Rupiah (contoh: 1500000)'],
+      [''],
+      ['KOLOM OPSIONAL:'],
+      ['5. No. Bukti - Jika kosong, akan dibuat otomatis'],
+      ['6. Kategori - Pilih dari daftar berikut:'],
+      ...KATEGORI_BOSP.map(k => ['   - ' + k]),
+      ['7. Kode Rekening - Contoh: 5.1.02.01'],
+      ['8. Penerima - Nama pihak yang menerima/memberi dana'],
+      ['9. Keterangan - Catatan tambahan'],
+      [''],
+      ['CATATAN PENTING:'],
+      ['- Baris pertama adalah header, jangan dihapus'],
+      ['- Data dimulai dari baris kedua'],
+      ['- Format tanggal bisa juga: DD/MM/YYYY atau DD-MM-YYYY'],
+      ['- Jumlah bisa dalam format: 1.500.000 atau 1500000'],
+      ['- Pastikan tidak ada baris kosong di tengah data'],
+    ];
+    
+    const wsPanduan = XLSX.utils.aoa_to_sheet(panduanData);
+    wsPanduan['!cols'] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, wsPanduan, 'Panduan');
+
+    // Download
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, 'Template_Import_Transaksi_BOSP.xlsx');
+  };
+
+  // Handle File Import
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Ambil sheet pertama
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (jsonData.length === 0) {
+          alert('File Excel kosong atau format tidak sesuai!');
+          return;
+        }
+
+        // Parse dan validasi data
+        const parsedData = jsonData.map((row: any) => ({
+          tanggal: parseExcelDate(row['Tanggal'] || row['tanggal']),
+          noBukti: row['No. Bukti'] || row['noBukti'] || '',
+          uraian: row['Uraian'] || row['uraian'] || '',
+          kategori: row['Kategori'] || row['kategori'] || '',
+          kodeRekening: row['Kode Rekening'] || row['kodeRekening'] || '',
+          jenis: (row['Jenis'] || row['jenis'] || '').toString().toLowerCase(),
+          jumlah: parseExcelNumber(row['Jumlah'] || row['jumlah']),
+          penerima: row['Penerima'] || row['penerima'] || '',
+          keterangan: row['Keterangan'] || row['keterangan'] || '',
+        }));
+
+        const validated = validateImportData(parsedData);
+        setImportData(validated);
+      } catch (error) {
+        console.error('Error parsing Excel:', error);
+        alert('Gagal membaca file Excel. Pastikan format sesuai template!');
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Confirm Import
+  const confirmImport = () => {
+    if (!importData || importData.valid.length === 0) {
+      alert('Tidak ada data valid untuk diimport!');
+      return;
+    }
+
+    const currentData = getTransaksi();
+    const newData = [...currentData, ...importData.valid];
+    saveTransaksi(newData);
+    
+    setTransaksi(newData);
+    setShowImportModal(false);
+    setImportData(null);
+    setImportFileName('');
+    
+    alert(`Berhasil mengimport ${importData.valid.length} transaksi!`);
+  };
+
   const filtered = transaksi
     .filter(t => filter === 'semua' || t.jenis === filter)
     .filter(t => t.uraian.toLowerCase().includes(search.toLowerCase()) || t.noBukti.toLowerCase().includes(search.toLowerCase()))
@@ -111,12 +279,26 @@ export default function Transaksi() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'keluar' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
           >Pengeluaran</button>
         </div>
-        <button
-          onClick={() => { setShowForm(true); setEditId(null); setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') }); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm"
-        >
-          <i className="fas fa-plus mr-2"></i>Tambah Transaksi
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium shadow-sm"
+          >
+            <i className="fas fa-file-import mr-2"></i>Import Excel
+          </button>
+          <button
+            onClick={downloadTemplate}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium shadow-sm"
+          >
+            <i className="fas fa-download mr-2"></i>Download Template
+          </button>
+          <button
+            onClick={() => { setShowForm(true); setEditId(null); setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') }); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm"
+          >
+            <i className="fas fa-plus mr-2"></i>Tambah Transaksi
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -275,6 +457,198 @@ export default function Transaksi() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-lg font-bold">
+                <i className="fas fa-file-excel mr-2 text-green-600"></i>
+                Import Transaksi dari Excel
+              </h3>
+              <button onClick={() => { setShowImportModal(false); setImportData(null); setImportFileName(''); }} className="text-gray-400 hover:text-gray-600">
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {!importData ? (
+                // Step 1: Upload File
+                <div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-blue-800 mb-2">
+                      <i className="fas fa-info-circle mr-2"></i>Petunjuk Import
+                    </h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Download template terlebih dahulu untuk mengetahui format yang benar</li>
+                      <li>• Kolom wajib: Tanggal, Uraian, Jenis (masuk/keluar), Jumlah</li>
+                      <li>• Format tanggal: YYYY-MM-DD (contoh: 2026-01-15)</li>
+                      <li>• Jenis harus huruf kecil: "masuk" atau "keluar"</li>
+                      <li>• Jumlah dalam angka tanpa format Rupiah</li>
+                    </ul>
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <i className="fas fa-file-excel text-5xl text-green-500 mb-4"></i>
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">Pilih File Excel</h4>
+                    <p className="text-sm text-gray-500 mb-4">Format yang didukung: .xlsx, .xls</p>
+                    <label className="inline-block px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer font-medium">
+                      <i className="fas fa-upload mr-2"></i>Pilih File
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
+                    {importFileName && (
+                      <p className="mt-4 text-sm text-gray-600">
+                        <i className="fas fa-file mr-2"></i>
+                        File: <span className="font-medium">{importFileName}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={downloadTemplate}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      <i className="fas fa-download mr-1"></i>Download Template Format Excel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Step 2: Preview & Confirm
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <i className="fas fa-check text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                          <p className="text-sm text-green-600">Data Valid</p>
+                          <p className="text-2xl font-bold text-green-700">{importData.valid.length}</p>
+                          <p className="text-xs text-green-600">siap diimport</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                          <i className="fas fa-times text-red-600 text-xl"></i>
+                        </div>
+                        <div>
+                          <p className="text-sm text-red-600">Data Tidak Valid</p>
+                          <p className="text-2xl font-bold text-red-700">{importData.invalid.length}</p>
+                          <p className="text-xs text-red-600">akan dilewati</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview Data Valid */}
+                  {importData.valid.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-700 mb-2">
+                        <i className="fas fa-eye mr-2 text-green-600"></i>
+                        Preview Data yang Akan Diimport (Maks 10 baris)
+                      </h4>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left">Tanggal</th>
+                              <th className="px-3 py-2 text-left">Uraian</th>
+                              <th className="px-3 py-2 text-left">Kategori</th>
+                              <th className="px-3 py-2 text-center">Jenis</th>
+                              <th className="px-3 py-2 text-right">Jumlah</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importData.valid.slice(0, 10).map((item, i) => (
+                              <tr key={i} className="border-t">
+                                <td className="px-3 py-2">{item.tanggal}</td>
+                                <td className="px-3 py-2">{item.uraian}</td>
+                                <td className="px-3 py-2">{item.kategori}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-xs ${item.jenis === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {item.jenis}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right font-medium">{formatRupiah(item.jumlah)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {importData.valid.length > 10 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          ...dan {importData.valid.length - 10} data lainnya
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error Details */}
+                  {importData.invalid.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-700 mb-2">
+                        <i className="fas fa-exclamation-triangle mr-2 text-red-600"></i>
+                        Data yang Tidak Valid (Akan Dilewati)
+                      </h4>
+                      <div className="overflow-x-auto border rounded-lg max-h-48 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-red-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left">Baris</th>
+                              <th className="px-3 py-2 text-left">Uraian</th>
+                              <th className="px-3 py-2 text-left">Error</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importData.invalid.map((item, i) => (
+                              <tr key={i} className="border-t">
+                                <td className="px-3 py-2">{item.row}</td>
+                                <td className="px-3 py-2">{item.data.uraian || '-'}</td>
+                                <td className="px-3 py-2 text-red-600">{item.errors.join(', ')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 justify-end pt-4 border-t">
+                    <button
+                      onClick={() => { setImportData(null); setImportFileName(''); }}
+                      className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                    >
+                      <i className="fas fa-arrow-left mr-2"></i>Pilih File Lain
+                    </button>
+                    <button
+                      onClick={() => { setShowImportModal(false); setImportData(null); setImportFileName(''); }}
+                      className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={confirmImport}
+                      disabled={importData.valid.length === 0}
+                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      <i className="fas fa-check mr-2"></i>
+                      Import {importData.valid.length} Data
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
