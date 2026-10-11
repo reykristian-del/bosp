@@ -18,7 +18,8 @@ export interface BuktiKasPengeluaran {
   transaksiId: string; // referensi ke transaksi
   noBukti: string;
   tanggal: string;
-  telahTerimaDari: string;
+  telahTerimaDari: string; // default: nama sekolah
+  penerima: string; // dari data transaksi
   jumlahUang: number;
   terbilang: string;
   untukPembayaran: string;

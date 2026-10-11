@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan } from '../utils';
+import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan, formatTanggalIndonesia } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } from 'docx';
@@ -113,7 +113,7 @@ export default function Laporan() {
       ['No', 'Tanggal', 'No. Bukti', 'Uraian', 'Kategori', 'Kode Rek.', 'Jenis', 'Jumlah (Rp)'],
       ...filtered.sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()).map((t, i) => [
         i + 1,
-        t.tanggal,
+        formatTanggalIndonesia(t.tanggal),
         t.noBukti,
         t.uraian,
         t.kategori,

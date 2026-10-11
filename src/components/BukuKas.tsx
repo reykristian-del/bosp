@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan } from '../utils';
+import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan, formatTanggalIndonesia } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -50,7 +50,7 @@ export default function BukuKas() {
       ['No', 'Tanggal', 'No. Bukti', 'Uraian', 'Kode Rek.', 'Pemasukan (Rp)', 'Pengeluaran (Rp)', 'Saldo (Rp)'],
       ...bukuKasData.map((t, i) => [
         i + 1,
-        t.tanggal,
+        formatTanggalIndonesia(t.tanggal),
         t.noBukti,
         t.uraian,
         t.kodeRekening,
