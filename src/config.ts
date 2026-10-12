@@ -8,7 +8,14 @@ export const APP_CONFIG = {
   STORAGE_MODE: 'mysql' as 'local' | 'mysql',
   
   // URL Backend API (sesuaikan dengan domain hosting Anda)
+  // Contoh:
+  // - '/api' jika di root domain
+  // - '/bosp/api' jika di subfolder /bosp/
+  // - 'https://domain.com/api' jika di domain berbeda
   API_BASE_URL: '/api',
+  
+  // Debug mode - tampilkan log di console
+  DEBUG: true,
   
   // Timeout API dalam milidetik
   API_TIMEOUT: 10000,

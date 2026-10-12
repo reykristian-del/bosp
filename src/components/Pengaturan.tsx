@@ -354,6 +354,16 @@ export default function Pengaturan() {
                   <p className="text-xs text-purple-700 mb-3">
                     Sinkronisasi data dari localStorage ke database MySQL. Gunakan ini jika Anda baru saja mengaktifkan mode MySQL.
                   </p>
+                  
+                  {/* Debug Info */}
+                  <div className="bg-white rounded p-2 mb-3 text-xs">
+                    <p className="text-gray-600"><strong>Sync URL:</strong></p>
+                    <code className="text-blue-600 break-all">{window.location.origin}{APP_CONFIG.API_BASE_URL}/sync</code>
+                    <p className="text-gray-500 mt-1">
+                      Pastikan file <code className="bg-gray-100 px-1 rounded">sync.php</code> ada di folder <code className="bg-gray-100 px-1 rounded">{APP_CONFIG.API_BASE_URL}/</code>
+                    </p>
+                  </div>
+                  
                   <button 
                     onClick={handleSync} 
                     disabled={syncing}
@@ -362,6 +372,11 @@ export default function Pengaturan() {
                     <i className={`fas ${syncing ? 'fa-spinner fa-spin' : 'fa-sync'} mr-2`}></i>
                     {syncing ? 'Syncing...' : 'Sync ke MySQL'}
                   </button>
+                  
+                  <p className="text-xs text-gray-500 mt-2">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Buka Console browser (F12) untuk melihat detail proses sync
+                  </p>
                 </div>
               )}
 
