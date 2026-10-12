@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react';
 import { PengaturanSekolah } from '../types';
 import { getPengaturan, savePengaturan } from '../utils';
+import { APP_CONFIG, isMySQLMode } from '../config';
+import { checkHealth, syncLocalToMySQL } from '../api';
 
 export default function Pengaturan() {
   const [form, setForm] = useState<PengaturanSekolah>(getPengaturan());
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'sekolah' | 'pegawai' | 'anggaran' | 'database'>('sekolah');
+  const [apiStatus, setApiStatus] = useState<{ status: string; message: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const checkAPI = async () => {
+    const result = await checkHealth();
+    setApiStatus(result);
+  };
+
+  const handleSync = async () => {
+    if (!confirm('Sync semua data dari localStorage ke MySQL?')) return;
+    setSyncing(true);
+    const result = await syncLocalToMySQL();
+    setSyncing(false);
+    if (result.success) {
+      alert('Sync berhasil!');
+    } else {
+      alert('Sync gagal: ' + result.message);
+    }
+  };
 
   useEffect(() => {
     setForm(getPengaturan());
@@ -232,23 +253,74 @@ export default function Pengaturan() {
                 <i className="fas fa-database text-blue-500"></i>Manajemen Database
               </h4>
               
-              {/* Info MySQL */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h5 className="font-medium text-blue-800 mb-2">
-                  <i className="fas fa-database mr-2"></i>Koneksi MySQL
-                </h5>
-                <p className="text-sm text-blue-700 mb-3">
-                  Aplikasi ini saat ini menggunakan penyimpanan lokal (localStorage). Untuk menggunakan database MySQL, 
-                  Anda perlu menginstal backend PHP yang tersedia di folder <code className="bg-blue-100 px-1 rounded">backend/</code> pada proyek ini.
-                </p>
-                <div className="bg-white rounded p-3 text-xs font-mono text-gray-700 space-y-1">
-                  <p className="text-gray-500">-- Konfigurasi Database MySQL --</p>
-                  <p>Host: localhost</p>
-                  <p>Database: bosp_smpn1</p>
-                  <p>Username: root</p>
-                  <p>Port: 3306</p>
+              {/* Status Mode */}
+              <div className={`border rounded-lg p-4 ${isMySQLMode() ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isMySQLMode() ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                    <i className={`fas ${isMySQLMode() ? 'fa-database text-green-600' : 'fa-hdd text-yellow-600'} text-xl`}></i>
+                  </div>
+                  <div>
+                    <p className={`font-bold ${isMySQLMode() ? 'text-green-800' : 'text-yellow-800'}`}>
+                      Mode: {isMySQLMode() ? 'MySQL Database' : 'Local Storage'}
+                    </p>
+                    <p className={`text-sm ${isMySQLMode() ? 'text-green-700' : 'text-yellow-700'}`}>
+                      {isMySQLMode() 
+                        ? 'Data tersimpan di database MySQL terpusat' 
+                        : 'Data tersimpan di browser (localStorage)'}
+                    </p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Info MySQL */}
+              {isMySQLMode() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h5 className="font-medium text-blue-800 mb-2">
+                    <i className="fas fa-server mr-2"></i>Konfigurasi API
+                  </h5>
+                  <div className="bg-white rounded p-3 text-xs font-mono text-gray-700 space-y-1">
+                    <p><span className="text-gray-500">API URL:</span> {APP_CONFIG.API_BASE_URL}</p>
+                    <p><span className="text-gray-500">Timeout:</span> {APP_CONFIG.API_TIMEOUT}ms</p>
+                    <p><span className="text-gray-500">Version:</span> {APP_CONFIG.VERSION}</p>
+                  </div>
+                  <button 
+                    onClick={checkAPI}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                  >
+                    <i className="fas fa-plug mr-2"></i>Test Koneksi API
+                  </button>
+                  {apiStatus && (
+                    <div className={`mt-3 p-3 rounded ${apiStatus.status === 'ok' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <p className="text-sm font-medium">
+                        <i className={`fas ${apiStatus.status === 'ok' ? 'fa-check-circle' : 'fa-times-circle'} mr-2`}></i>
+                        {apiStatus.message}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {!isMySQLMode() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h5 className="font-medium text-blue-800 mb-2">
+                    <i className="fas fa-info-circle mr-2"></i>Aktifkan MySQL
+                  </h5>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Untuk menggunakan database MySQL, ikuti langkah berikut:
+                  </p>
+                  <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
+                    <li>Setup database MySQL di cPanel</li>
+                    <li>Upload folder <code className="bg-blue-100 px-1 rounded">backend/</code> ke hosting</li>
+                    <li>Edit <code className="bg-blue-100 px-1 rounded">backend/config.php</code> dengan kredensial database</li>
+                    <li>Edit <code className="bg-blue-100 px-1 rounded">src/config.ts</code> ubah <code>STORAGE_MODE</code> ke <code>'mysql'</code></li>
+                    <li>Build ulang dan upload ke hosting</li>
+                  </ol>
+                  <p className="text-xs text-blue-600 mt-3">
+                    <i className="fas fa-book mr-1"></i>
+                    Lihat file <strong>INTEGRASI_MYSQL.md</strong> untuk panduan lengkap
+                  </p>
+                </div>
+              )}
 
               {/* Backup & Restore */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -272,6 +344,26 @@ export default function Pengaturan() {
                   </label>
                 </div>
               </div>
+
+              {/* Sync to MySQL */}
+              {isMySQLMode() && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <h5 className="font-medium text-purple-800 mb-2">
+                    <i className="fas fa-sync mr-2"></i>Sync Data ke MySQL
+                  </h5>
+                  <p className="text-xs text-purple-700 mb-3">
+                    Sinkronisasi data dari localStorage ke database MySQL. Gunakan ini jika Anda baru saja mengaktifkan mode MySQL.
+                  </p>
+                  <button 
+                    onClick={handleSync} 
+                    disabled={syncing}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:bg-gray-400"
+                  >
+                    <i className={`fas ${syncing ? 'fa-spinner fa-spin' : 'fa-sync'} mr-2`}></i>
+                    {syncing ? 'Syncing...' : 'Sync ke MySQL'}
+                  </button>
+                </div>
+              )}
 
               {/* Reset */}
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">

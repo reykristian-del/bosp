@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS transaksi (
     kategori VARCHAR(200),
     kode_rekening VARCHAR(20),
     jumlah DECIMAL(18,2) NOT NULL DEFAULT 0,
+    pajak DECIMAL(18,2) DEFAULT 0,
     jenis ENUM('masuk', 'keluar') NOT NULL,
     keterangan TEXT,
     penerima VARCHAR(200),
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS bukti_kas (
     no_bukti VARCHAR(50) NOT NULL,
     tanggal DATE NOT NULL,
     telah_terima_dari VARCHAR(200),
+    penerima VARCHAR(200),
     jumlah_uang DECIMAL(18,2) NOT NULL DEFAULT 0,
     terbilang TEXT,
     untuk_pembayaran TEXT,
@@ -81,10 +83,12 @@ CREATE TABLE IF NOT EXISTS bukti_kas (
 CREATE TABLE IF NOT EXISTS bukti_kas_item (
     id INT AUTO_INCREMENT PRIMARY KEY,
     bukti_kas_id VARCHAR(50) NOT NULL,
+    kode_rekening VARCHAR(20),
     uraian TEXT NOT NULL,
     volume VARCHAR(50),
     satuan VARCHAR(50),
     harga_satuan DECIMAL(18,2) NOT NULL DEFAULT 0,
+    pajak DECIMAL(18,2) DEFAULT 0,
     jumlah DECIMAL(18,2) NOT NULL DEFAULT 0,
     FOREIGN KEY (bukti_kas_id) REFERENCES bukti_kas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

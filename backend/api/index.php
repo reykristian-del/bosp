@@ -4,6 +4,7 @@
  * SMP Negeri 1 Tulang Bawang Barat
  * 
  * Endpoint:
+ * GET    /api/health             - Health check
  * GET    /api/transaksi          - List semua transaksi
  * POST   /api/transaksi          - Tambah transaksi
  * PUT    /api/transaksi/{id}     - Update transaksi
@@ -24,7 +25,18 @@
  * GET    /api/laporan/bulanan    - Laporan per bulan
  */
 
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../config.php';
+
+// Health check endpoint
+if ($_SERVER['REQUEST_URI'] === '/api/health' || $_SERVER['REQUEST_URI'] === '/api/health/') {
+    try {
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->query("SELECT 1");
+        jsonResponse(['status' => 'ok', 'message' => 'API dan database terhubung', 'timestamp' => date('Y-m-d H:i:s')]);
+    } catch (Exception $e) {
+        jsonResponse(['status' => 'error', 'message' => 'Database tidak terhubung: ' . $e->getMessage()], 500);
+    }
+}
 
 $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -58,10 +70,22 @@ try {
             handleLaporan($db, $method, $action);
             break;
         default:
-            jsonResponse(['message' => 'API Sistem Pembukuan BOSP - SMP Negeri 1 Tulang Bawang Barat', 'version' => '1.0']);
+            jsonResponse([
+                'message' => 'API Sistem Pembukuan BOSP',
+                'school' => 'SMP Negeri 1 Tulang Bawang Barat',
+                'version' => '2.0.0',
+                'endpoints' => [
+                    'health' => 'GET /api/health',
+                    'transaksi' => 'GET/POST/PUT/DELETE /api/transaksi',
+                    'bukti_kas' => 'GET/POST/DELETE /api/bukti-kas',
+                    'pengaturan' => 'GET/PUT /api/pengaturan',
+                    'saldo' => 'GET/PUT /api/saldo',
+                    'laporan' => 'GET /api/laporan/{ringkasan|kategori|bulanan}'
+                ]
+            ]);
     }
 } catch (Exception $e) {
-    jsonResponse(['error' => $e->getMessage()], 500);
+    jsonResponse(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
 }
 
 /**
@@ -107,25 +131,56 @@ function handleTransaksi($db, $method, $id) {
             $input = getInput();
             validateRequired($input, ['tanggal', 'no_bukti', 'uraian', 'jenis', 'jumlah']);
             
-            $id = generateId();
-            $stmt = $db->prepare("
-                INSERT INTO transaksi (id, tanggal, no_bukti, uraian, kategori, kode_rekening, jumlah, jenis, keterangan, penerima, status_bukti)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE)
-            ");
-            $stmt->execute([
-                $id,
-                $input['tanggal'],
-                $input['no_bukti'],
-                $input['uraian'],
-                $input['kategori'] ?? '',
-                $input['kode_rekening'] ?? '',
-                $input['jumlah'],
-                $input['jenis'],
-                $input['keterangan'] ?? '',
-                $input['penerima'] ?? '',
-            ]);
+            $id = $input['id'] ?? generateId();
             
-            jsonResponse(['id' => $id, 'message' => 'Transaksi berhasil ditambahkan'], 201);
+            // Check if already exists
+            $stmt = $db->prepare("SELECT id FROM transaksi WHERE id = ?");
+            $stmt->execute([$id]);
+            if ($stmt->fetch()) {
+                // Update existing
+                $stmt = $db->prepare("
+                    UPDATE transaksi SET 
+                        tanggal = ?, no_bukti = ?, uraian = ?, kategori = ?, kode_rekening = ?, 
+                        jumlah = ?, pajak = ?, jenis = ?, keterangan = ?, penerima = ?, status_bukti = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([
+                    $input['tanggal'],
+                    $input['no_bukti'],
+                    $input['uraian'],
+                    $input['kategori'] ?? '',
+                    $input['kode_rekening'] ?? '',
+                    $input['jumlah'],
+                    $input['pajak'] ?? 0,
+                    $input['jenis'],
+                    $input['keterangan'] ?? '',
+                    $input['penerima'] ?? '',
+                    $input['status_bukti'] ?? false,
+                    $id
+                ]);
+            } else {
+                // Insert new
+                $stmt = $db->prepare("
+                    INSERT INTO transaksi (id, tanggal, no_bukti, uraian, kategori, kode_rekening, jumlah, pajak, jenis, keterangan, penerima, status_bukti)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $id,
+                    $input['tanggal'],
+                    $input['no_bukti'],
+                    $input['uraian'],
+                    $input['kategori'] ?? '',
+                    $input['kode_rekening'] ?? '',
+                    $input['jumlah'],
+                    $input['pajak'] ?? 0,
+                    $input['jenis'],
+                    $input['keterangan'] ?? '',
+                    $input['penerima'] ?? '',
+                    $input['status_bukti'] ?? false,
+                ]);
+            }
+            
+            jsonResponse(['id' => $id, 'message' => 'Transaksi berhasil disimpan'], 201);
             break;
             
         case 'PUT':
@@ -134,7 +189,7 @@ function handleTransaksi($db, $method, $id) {
             
             $fields = [];
             $params = [];
-            $allowed = ['tanggal', 'no_bukti', 'uraian', 'kategori', 'kode_rekening', 'jumlah', 'jenis', 'keterangan', 'penerima', 'status_bukti'];
+            $allowed = ['tanggal', 'no_bukti', 'uraian', 'kategori', 'kode_rekening', 'jumlah', 'pajak', 'jenis', 'keterangan', 'penerima', 'status_bukti'];
             
             foreach ($allowed as $field) {
                 if (isset($input[$field])) {
@@ -189,7 +244,20 @@ function handleBuktiKas($db, $method, $id) {
                 jsonResponse($bukti);
             } else {
                 $stmt = $db->query("SELECT * FROM bukti_kas ORDER BY tanggal DESC");
-                jsonResponse($stmt->fetchAll());
+                $list = $stmt->fetchAll();
+                
+                // Get items for each
+                foreach ($list as &$bukti) {
+                    $stmt = $db->prepare("SELECT * FROM bukti_kas_item WHERE bukti_kas_id = ?");
+                    $stmt->execute([$bukti['id']]);
+                    $bukti['items'] = $stmt->fetchAll();
+                    
+                    $stmt = $db->prepare("SELECT nama_dokumen FROM dokumen_pendukung WHERE bukti_kas_id = ?");
+                    $stmt->execute([$bukti['id']]);
+                    $bukti['dokumen_pendukung'] = array_column($stmt->fetchAll(), 'nama_dokumen');
+                }
+                
+                jsonResponse($list);
             }
             break;
             
@@ -197,12 +265,25 @@ function handleBuktiKas($db, $method, $id) {
             $input = getInput();
             validateRequired($input, ['transaksi_id', 'no_bukti', 'tanggal', 'jumlah_uang']);
             
-            $id = generateId();
+            $id = $input['id'] ?? generateId();
+            
+            // Check if already exists
+            $stmt = $db->prepare("SELECT id FROM bukti_kas WHERE id = ?");
+            $stmt->execute([$id]);
+            if ($stmt->fetch()) {
+                // Delete old data first
+                $stmt = $db->prepare("DELETE FROM bukti_kas_item WHERE bukti_kas_id = ?");
+                $stmt->execute([$id]);
+                $stmt = $db->prepare("DELETE FROM dokumen_pendukung WHERE bukti_kas_id = ?");
+                $stmt->execute([$id]);
+                $stmt = $db->prepare("DELETE FROM bukti_kas WHERE id = ?");
+                $stmt->execute([$id]);
+            }
             
             // Insert bukti kas
             $stmt = $db->prepare("
-                INSERT INTO bukti_kas (id, transaksi_id, no_bukti, tanggal, telah_terima_dari, jumlah_uang, terbilang, untuk_pembayaran, kategori, kode_rekening)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO bukti_kas (id, transaksi_id, no_bukti, tanggal, telah_terima_dari, penerima, jumlah_uang, terbilang, untuk_pembayaran, kategori, kode_rekening)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $id,
@@ -210,6 +291,7 @@ function handleBuktiKas($db, $method, $id) {
                 $input['no_bukti'],
                 $input['tanggal'],
                 $input['telah_terima_dari'] ?? '',
+                $input['penerima'] ?? '',
                 $input['jumlah_uang'],
                 $input['terbilang'] ?? '',
                 $input['untuk_pembayaran'] ?? '',
@@ -220,16 +302,18 @@ function handleBuktiKas($db, $method, $id) {
             // Insert items
             if (isset($input['items']) && is_array($input['items'])) {
                 $stmt = $db->prepare("
-                    INSERT INTO bukti_kas_item (bukti_kas_id, uraian, volume, satuan, harga_satuan, jumlah)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO bukti_kas_item (bukti_kas_id, kode_rekening, uraian, volume, satuan, harga_satuan, pajak, jumlah)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 foreach ($input['items'] as $item) {
                     $stmt->execute([
                         $id,
+                        $item['kodeRekening'] ?? $item['kode_rekening'] ?? '',
                         $item['uraian'] ?? '',
                         $item['volume'] ?? '',
                         $item['satuan'] ?? '',
-                        $item['harga_satuan'] ?? 0,
+                        $item['harga_satuan'] ?? $item['hargaSatuan'] ?? 0,
+                        $item['pajak'] ?? 0,
                         $item['jumlah'] ?? 0,
                     ]);
                 }
