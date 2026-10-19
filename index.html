@@ -6,6 +6,18 @@
     <meta name="description" content="Sistem Informasi Pembukuan Dana BOSP - SMP Negeri 1 Tulang Bawang Barat" />
     <meta name="theme-color" content="#1e40af" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    
+    <!-- Content Security Policy - Izinkan eval untuk library Excel/Word -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+      style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+      img-src 'self' data: blob: https:;
+      font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+      connect-src 'self' https: http:;
+      worker-src 'self' blob:;
+    " />
+    
     <title>Sistem Pembukuan BOSP - SMP Negeri 1 Tulang Bawang Barat</title>
     
     <!-- Font Awesome dengan fallback -->

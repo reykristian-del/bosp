@@ -48,8 +48,14 @@
     ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>
 
-# Security Headers
+# Security Headers dengan CSP yang mengizinkan eval
 <IfModule mod_headers.c>
+    # Hapus CSP default hosting jika ada
+    Header unset Content-Security-Policy
+    
+    # Set CSP yang mengizinkan eval untuk library Excel/Word
+    Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; connect-src 'self' https: http:; worker-src 'self' blob:;"
+    
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
