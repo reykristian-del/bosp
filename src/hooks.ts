@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transaksi, BuktiKasPengeluaran, PengaturanSekolah } from './types';
-import { 
-  getTransaksi, saveTransaksi, 
-  getBuktiKas, saveBuktiKas,
-  getPengaturan, savePengaturan,
-  getSaldoAwal, saveSaldoAwal
-} from './utils';
-import { isMySQLMode } from './config';
+import { APP_CONFIG } from './config';
 import {
   fetchTransaksi, createTransaksi, updateTransaksiAPI, deleteTransaksiAPI,
   fetchBuktiKas, createBuktiKas, deleteBuktiKasAPI,
@@ -14,24 +8,34 @@ import {
   fetchSaldo, updateSaldo
 } from './api';
 
+// Helper untuk logging
+function log(...args: any[]) {
+  if (APP_CONFIG.DEBUG) {
+    console.log('[HOOKS]', ...args);
+  }
+}
+
 // ==================== TRANSAKSI HOOKS ====================
 
 export function useTransaksi() {
   const [data, setData] = useState<Transaksi[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
+    log('🔄 Loading transaksi from MySQL...');
+    
     try {
-      if (isMySQLMode()) {
-        const result = await fetchTransaksi();
-        setData(result);
-      } else {
-        setData(getTransaksi());
-      }
+      const result = await fetchTransaksi();
+      log('✅ Transaksi loaded:', result.length, 'records');
+      setData(result);
     } catch (error) {
-      console.error('Error loading transaksi:', error);
-      setData(getTransaksi());
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error loading transaksi:', errorMsg);
+      setError(errorMsg);
+      setData([]); // Set empty array instead of localStorage fallback
     } finally {
       setLoading(false);
     }
@@ -42,37 +46,45 @@ export function useTransaksi() {
   }, []);
 
   const add = async (transaksi: Transaksi) => {
-    if (isMySQLMode()) {
+    log('➕ Adding transaksi:', transaksi);
+    try {
       await createTransaksi(transaksi);
-    } else {
-      const list = getTransaksi();
-      list.push(transaksi);
-      saveTransaksi(list);
+      log('✅ Transaksi added successfully');
+      await loadData(); // Reload from database
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error adding transaksi:', errorMsg);
+      throw error;
     }
-    await loadData();
   };
 
-  const update = async (id: string, data: Partial<Transaksi>) => {
-    if (isMySQLMode()) {
-      await updateTransaksiAPI(id, data);
-    } else {
-      const list = getTransaksi().map(t => t.id === id ? { ...t, ...data } : t);
-      saveTransaksi(list);
+  const update = async (id: string, updateData: Partial<Transaksi>) => {
+    log('✏️ Updating transaksi:', id, updateData);
+    try {
+      await updateTransaksiAPI(id, updateData);
+      log('✅ Transaksi updated successfully');
+      await loadData(); // Reload from database
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error updating transaksi:', errorMsg);
+      throw error;
     }
-    await loadData();
   };
 
   const remove = async (id: string) => {
-    if (isMySQLMode()) {
+    log('🗑️ Deleting transaksi:', id);
+    try {
       await deleteTransaksiAPI(id);
-    } else {
-      const list = getTransaksi().filter(t => t.id !== id);
-      saveTransaksi(list);
+      log('✅ Transaksi deleted successfully');
+      await loadData(); // Reload from database
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error deleting transaksi:', errorMsg);
+      throw error;
     }
-    await loadData();
   };
 
-  return { data, loading, add, update, remove, reload: loadData };
+  return { data, loading, error, add, update, remove, reload: loadData };
 }
 
 // ==================== BUKTI KAS HOOKS ====================
@@ -80,19 +92,22 @@ export function useTransaksi() {
 export function useBuktiKas() {
   const [data, setData] = useState<BuktiKasPengeluaran[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
+    log('🔄 Loading bukti kas from MySQL...');
+    
     try {
-      if (isMySQLMode()) {
-        const result = await fetchBuktiKas();
-        setData(result);
-      } else {
-        setData(getBuktiKas());
-      }
+      const result = await fetchBuktiKas();
+      log('✅ Bukti kas loaded:', result.length, 'records');
+      setData(result);
     } catch (error) {
-      console.error('Error loading bukti kas:', error);
-      setData(getBuktiKas());
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error loading bukti kas:', errorMsg);
+      setError(errorMsg);
+      setData([]); // Set empty array instead of localStorage fallback
     } finally {
       setLoading(false);
     }
@@ -103,27 +118,32 @@ export function useBuktiKas() {
   }, []);
 
   const add = async (bukti: BuktiKasPengeluaran) => {
-    if (isMySQLMode()) {
+    log('➕ Adding bukti kas:', bukti);
+    try {
       await createBuktiKas(bukti);
-    } else {
-      const list = getBuktiKas();
-      list.push(bukti);
-      saveBuktiKas(list);
+      log('✅ Bukti kas added successfully');
+      await loadData(); // Reload from database
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error adding bukti kas:', errorMsg);
+      throw error;
     }
-    await loadData();
   };
 
   const remove = async (id: string) => {
-    if (isMySQLMode()) {
+    log('🗑️ Deleting bukti kas:', id);
+    try {
       await deleteBuktiKasAPI(id);
-    } else {
-      const list = getBuktiKas().filter(b => b.id !== id);
-      saveBuktiKas(list);
+      log('✅ Bukti kas deleted successfully');
+      await loadData(); // Reload from database
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error deleting bukti kas:', errorMsg);
+      throw error;
     }
-    await loadData();
   };
 
-  return { data, loading, add, remove, reload: loadData };
+  return { data, loading, error, add, remove, reload: loadData };
 }
 
 // ==================== PENGATURAN HOOKS ====================
@@ -131,19 +151,22 @@ export function useBuktiKas() {
 export function usePengaturan() {
   const [data, setData] = useState<PengaturanSekolah | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
+    log('🔄 Loading pengaturan from MySQL...');
+    
     try {
-      if (isMySQLMode()) {
-        const result = await fetchPengaturan();
-        setData(result);
-      } else {
-        setData(getPengaturan());
-      }
+      const result = await fetchPengaturan();
+      log('✅ Pengaturan loaded:', result);
+      setData(result);
     } catch (error) {
-      console.error('Error loading pengaturan:', error);
-      setData(getPengaturan());
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error loading pengaturan:', errorMsg);
+      setError(errorMsg);
+      setData(null); // Set null instead of localStorage fallback
     } finally {
       setLoading(false);
     }
@@ -154,15 +177,19 @@ export function usePengaturan() {
   }, []);
 
   const update = async (pengaturan: PengaturanSekolah) => {
-    if (isMySQLMode()) {
+    log('✏️ Updating pengaturan:', pengaturan);
+    try {
       await updatePengaturan(pengaturan);
-    } else {
-      savePengaturan(pengaturan);
+      log('✅ Pengaturan updated successfully');
+      setData(pengaturan); // Update local state
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error updating pengaturan:', errorMsg);
+      throw error;
     }
-    setData(pengaturan);
   };
 
-  return { data, loading, update, reload: loadData };
+  return { data, loading, error, update, reload: loadData };
 }
 
 // ==================== SALDO HOOKS ====================
@@ -174,19 +201,23 @@ export function useSaldo() {
     keterangan: '' 
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
+    log('🔄 Loading saldo from MySQL...');
+    
     try {
-      if (isMySQLMode()) {
-        const result = await fetchSaldo();
-        setData(result);
-      } else {
-        setData(getSaldoAwal());
-      }
+      const result = await fetchSaldo();
+      log('✅ Saldo loaded:', result);
+      setData(result);
     } catch (error) {
-      console.error('Error loading saldo:', error);
-      setData(getSaldoAwal());
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error loading saldo:', errorMsg);
+      setError(errorMsg);
+      // Set default empty saldo instead of localStorage fallback
+      setData({ tanggal: '', jumlah: 0, keterangan: '' });
     } finally {
       setLoading(false);
     }
@@ -197,13 +228,17 @@ export function useSaldo() {
   }, []);
 
   const update = async (saldo: { tanggal: string; jumlah: number; keterangan: string }) => {
-    if (isMySQLMode()) {
+    log('✏️ Updating saldo:', saldo);
+    try {
       await updateSaldo(saldo);
-    } else {
-      saveSaldoAwal(saldo);
+      log('✅ Saldo updated successfully');
+      setData(saldo); // Update local state
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      log('❌ Error updating saldo:', errorMsg);
+      throw error;
     }
-    setData(saldo);
   };
 
-  return { data, loading, update, reload: loadData };
+  return { data, loading, error, update, reload: loadData };
 }

@@ -4,7 +4,7 @@
  */
 
 export const APP_CONFIG = {
-  // Mode penyimpanan: 'local' atau 'mysql'
+  // Mode penyimpanan: SELALU gunakan MySQL untuk akses online
   STORAGE_MODE: 'mysql' as 'local' | 'mysql',
   
   // URL Backend API - APLIKASI BERADA DI SUBFOLDER /bosp/
@@ -14,12 +14,15 @@ export const APP_CONFIG = {
   DEBUG: true,
   
   // Timeout API dalam milidetik
-  API_TIMEOUT: 10000,
+  API_TIMEOUT: 30000, // Increased to 30s for slow connections
   
   // Info Aplikasi
   APP_NAME: 'Sistem Pembukuan BOSP',
   SCHOOL_NAME: 'SMP Negeri 1 Tulang Bawang Barat',
-  VERSION: '2.0.0',
+  VERSION: '2.1.0',
+  
+  // Force MySQL mode - tidak ada fallback ke localStorage
+  FORCE_MYSQL: true,
 };
 
 // Helper untuk cek apakah menggunakan MySQL

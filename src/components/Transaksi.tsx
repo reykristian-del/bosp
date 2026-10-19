@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Transaksi as TransaksiType, KATEGORI_BOSP } from '../types';
-import { getTransaksi, addTransaksi, deleteTransaksi, updateTransaksi, generateId, formatRupiah, generateNoBukti, parseExcelDate, parseExcelNumber, validateImportData, saveTransaksi } from '../utils';
+import { useTransaksi } from '../hooks';
+import { generateId, formatRupiah, generateNoBukti, parseExcelDate, parseExcelNumber, validateImportData } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
 export default function Transaksi() {
-  const [transaksi, setTransaksi] = useState<TransaksiType[]>([]);
+  const { data: transaksi, loading, error, add, update, remove, reload } = useTransaksi();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'semua' | 'masuk' | 'keluar'>('semua');
@@ -30,47 +31,49 @@ export default function Transaksi() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    setTransaksi(getTransaksi());
     setForm(f => ({ ...f, noBukti: generateNoBukti('TRX') }));
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editId) {
-      updateTransaksi(editId, {
-        tanggal: form.tanggal,
-        noBukti: form.noBukti,
-        uraian: form.uraian,
-        kategori: form.kategori,
-        kodeRekening: form.kodeRekening,
-        jumlah: parseFloat(form.jumlah) || 0,
-        pajak: parseFloat(form.pajak) || 0,
-        jenis: form.jenis,
-        keterangan: form.keterangan,
-        penerima: form.penerima,
-      });
-    } else {
-      const newTransaksi: TransaksiType = {
-        id: generateId(),
-        tanggal: form.tanggal,
-        noBukti: form.noBukti,
-        uraian: form.uraian,
-        kategori: form.kategori,
-        kodeRekening: form.kodeRekening,
-        jumlah: parseFloat(form.jumlah) || 0,
-        pajak: parseFloat(form.pajak) || 0,
-        jenis: form.jenis,
-        keterangan: form.keterangan,
-        penerima: form.penerima,
-        statusBukti: false,
-        createdAt: new Date().toISOString(),
-      };
-      addTransaksi(newTransaksi);
+    try {
+      if (editId) {
+        await update(editId, {
+          tanggal: form.tanggal,
+          noBukti: form.noBukti,
+          uraian: form.uraian,
+          kategori: form.kategori,
+          kodeRekening: form.kodeRekening,
+          jumlah: parseFloat(form.jumlah) || 0,
+          pajak: parseFloat(form.pajak) || 0,
+          jenis: form.jenis,
+          keterangan: form.keterangan,
+          penerima: form.penerima,
+        });
+      } else {
+        const newTransaksi: TransaksiType = {
+          id: generateId(),
+          tanggal: form.tanggal,
+          noBukti: form.noBukti,
+          uraian: form.uraian,
+          kategori: form.kategori,
+          kodeRekening: form.kodeRekening,
+          jumlah: parseFloat(form.jumlah) || 0,
+          pajak: parseFloat(form.pajak) || 0,
+          jenis: form.jenis,
+          keterangan: form.keterangan,
+          penerima: form.penerima,
+          statusBukti: false,
+          createdAt: new Date().toISOString(),
+        };
+        await add(newTransaksi);
+      }
+      setShowForm(false);
+      setEditId(null);
+      setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') });
+    } catch (error) {
+      alert('Gagal menyimpan transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
-    setTransaksi(getTransaksi());
-    setShowForm(false);
-    setEditId(null);
-    setForm({ ...emptyForm, noBukti: generateNoBukti('TRX') });
   };
 
   const handleEdit = (t: TransaksiType) => {
@@ -90,10 +93,13 @@ export default function Transaksi() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) {
-      deleteTransaksi(id);
-      setTransaksi(getTransaksi());
+      try {
+        await remove(id);
+      } catch (error) {
+        alert('Gagal menghapus transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      }
     }
   };
 
@@ -248,22 +254,26 @@ export default function Transaksi() {
   };
 
   // Confirm Import
-  const confirmImport = () => {
+  const confirmImport = async () => {
     if (!importData || importData.valid.length === 0) {
       alert('Tidak ada data valid untuk diimport!');
       return;
     }
 
-    const currentData = getTransaksi();
-    const newData = [...currentData, ...importData.valid];
-    saveTransaksi(newData);
-    
-    setTransaksi(newData);
-    setShowImportModal(false);
-    setImportData(null);
-    setImportFileName('');
-    
-    alert(`Berhasil mengimport ${importData.valid.length} transaksi!`);
+    try {
+      // Add each transaction via API
+      for (const transaksi of importData.valid) {
+        await add(transaksi);
+      }
+      
+      setShowImportModal(false);
+      setImportData(null);
+      setImportFileName('');
+      
+      alert(`Berhasil mengimport ${importData.valid.length} transaksi!`);
+    } catch (error) {
+      alert('Gagal mengimport transaksi: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   };
 
   const filtered = transaksi

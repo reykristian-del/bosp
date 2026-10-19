@@ -1,24 +1,29 @@
 import { useState, useEffect } from 'react';
 import { BuktiKasPengeluaran, BuktiItem, Transaksi } from '../types';
-import { getBuktiKas, addBuktiKas, deleteBuktiKas, getTransaksi, updateTransaksi, generateId, formatRupiah, terbilang, formatTanggalIndonesia, getPengaturan } from '../utils';
+import { useBuktiKas, useTransaksi, usePengaturan } from '../hooks';
+import { generateId, formatRupiah, terbilang, formatTanggalIndonesia, updateTransaksi } from '../utils';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 
 export default function BuktiKas() {
-  const [buktiList, setBuktiList] = useState<BuktiKasPengeluaran[]>([]);
-  const [transaksiList, setTransaksiList] = useState<Transaksi[]>([]);
+  const { data: buktiList, loading: loadingBukti, add: addBukti, remove: removeBukti, reload: reloadBukti } = useBuktiKas();
+  const { data: transaksiList, loading: loadingTransaksi, reload: reloadTransaksi } = useTransaksi();
+  const { data: pengaturan } = usePengaturan();
+  
   const [showForm, setShowForm] = useState(false);
   const [showPreview, setShowPreview] = useState<BuktiKasPengeluaran | null>(null);
   const [selectedTransaksi, setSelectedTransaksi] = useState<Transaksi | null>(null as Transaksi | null);
   const [filterTransaksi, setFilterTransaksi] = useState<'belum' | 'semua'>('belum');
 
   const emptyItem: BuktiItem = { kodeRekening: '', uraian: '', volume: '', satuan: '', hargaSatuan: 0, pajak: 0, jumlah: 0 };
-  const pengaturan = getPengaturan();
+  
+  const defaultNamaSekolah = 'SMP Negeri 1 Tulang Bawang Barat';
+  const namaSekolah = pengaturan?.namaSekolah || defaultNamaSekolah;
 
   const [form, setForm] = useState({
     tanggal: new Date().toISOString().split('T')[0],
     noBukti: '',
-    telahTerimaDari: pengaturan.namaSekolah || 'SMP Negeri 1 Tulang Bawang Barat',
+    telahTerimaDari: namaSekolah,
     penerima: '',
     jumlahUang: '',
     untukPembayaran: '',
@@ -27,11 +32,6 @@ export default function BuktiKas() {
     dokumenPendukung: [] as string[],
     items: [{ ...emptyItem }],
   });
-
-  useEffect(() => {
-    setBuktiList(getBuktiKas());
-    setTransaksiList(getTransaksi());
-  }, []);
 
   // Filter transaksi yang belum dibuatkan bukti kas
   const transaksiTersedia = transaksiList
@@ -46,7 +46,7 @@ export default function BuktiKas() {
     setForm({
       tanggal: t.tanggal,
       noBukti: t.noBukti,
-      telahTerimaDari: pengaturan.namaSekolah || 'SMP Negeri 1 Tulang Bawang Barat',
+      telahTerimaDari: namaSekolah,
       penerima: t.penerima || '',
       jumlahUang: t.jumlah.toString(),
       untukPembayaran: t.uraian,

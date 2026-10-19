@@ -1,31 +1,48 @@
-import { useState, useEffect } from 'react';
-import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, saveSaldoAwal, getPengaturan } from '../utils';
+import { useState } from 'react';
+import { useTransaksi, useSaldo, usePengaturan } from '../hooks';
+import { formatRupiah } from '../utils';
 
 export default function Dashboard() {
-  const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
-  const [saldoAwal, setSaldoAwal] = useState<number>(0);
+  const { data: transaksi, loading: loadingTransaksi } = useTransaksi();
+  const { data: saldo, loading: loadingSaldo, update: updateSaldo } = useSaldo();
+  const { data: pengaturan, loading: loadingPengaturan } = usePengaturan();
+  
   const [showSaldoModal, setShowSaldoModal] = useState(false);
   const [inputSaldo, setInputSaldo] = useState('');
-  const pengaturan = getPengaturan();
 
-  useEffect(() => {
-    setTransaksi(getTransaksi());
-    const saldo = getSaldoAwal();
-    setSaldoAwal(saldo.jumlah);
-  }, []);
-
+  const saldoAwal = saldo?.jumlah || 0;
   const totalMasuk = transaksi.filter(t => t.jenis === 'masuk').reduce((sum, t) => sum + t.jumlah, 0);
   const totalKeluar = transaksi.filter(t => t.jenis === 'keluar').reduce((sum, t) => sum + t.jumlah, 0);
   const saldoAkhir = saldoAwal + totalMasuk - totalKeluar;
 
   const transaksiTerakhir = [...transaksi].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 5);
 
-  const handleSaveSaldo = () => {
+  // Default values if pengaturan is null
+  const defaultPengaturan = {
+    namaSekolah: 'SMP Negeri 1 Tulang Bawang Barat',
+    sumberDana: 'BOSP',
+    tahunAnggaran: new Date().getFullYear().toString(),
+    npsn: '',
+    kepalaSekolah: '',
+    nipKepsek: '',
+    bendahara: '',
+    nipBendahara: '',
+  };
+  
+  const peng = pengaturan || defaultPengaturan;
+
+  const handleSaveSaldo = async () => {
     const jumlah = parseFloat(inputSaldo) || 0;
-    saveSaldoAwal({ tanggal: new Date().toISOString().split('T')[0], jumlah, keterangan: 'Saldo Awal Dana BOSP' });
-    setSaldoAwal(jumlah);
-    setShowSaldoModal(false);
+    try {
+      await updateSaldo({ 
+        tanggal: new Date().toISOString().split('T')[0], 
+        jumlah, 
+        keterangan: 'Saldo Awal Dana BOSP' 
+      });
+      setShowSaldoModal(false);
+    } catch (error) {
+      alert('Gagal menyimpan saldo: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   };
 
   // Kategori breakdown
@@ -44,10 +61,10 @@ export default function Dashboard() {
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold">{pengaturan.namaSekolah || 'SMP Negeri 1 Tulang Bawang Barat'}</h3>
-            <p className="text-blue-100 mt-1">Sistem Pembukuan Dana {pengaturan.sumberDana || 'BOSP'}</p>
-            <p className="text-blue-200 text-sm mt-2">Tahun Anggaran {pengaturan.tahunAnggaran || new Date().getFullYear()}</p>
-            {pengaturan.npsn && <p className="text-blue-200 text-xs mt-1">NPSN: {pengaturan.npsn}</p>}
+            <h3 className="text-2xl font-bold">{peng.namaSekolah}</h3>
+            <p className="text-blue-100 mt-1">Sistem Pembukuan Dana {peng.sumberDana}</p>
+            <p className="text-blue-200 text-sm mt-2">Tahun Anggaran {peng.tahunAnggaran}</p>
+            {peng.npsn && <p className="text-blue-200 text-xs mt-1">NPSN: {peng.npsn}</p>}
           </div>
           <div className="text-right">
             <i className="fas fa-school text-5xl text-blue-200"></i>
@@ -196,13 +213,13 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500">Kepala Sekolah</p>
-            <p className="font-medium text-gray-800">{pengaturan.kepalaSekolah || '(Belum diatur)'}</p>
-            {pengaturan.nipKepsek && <p className="text-xs text-gray-500">NIP: {pengaturan.nipKepsek}</p>}
+            <p className="font-medium text-gray-800">{peng.kepalaSekolah || '(Belum diatur)'}</p>
+            {peng.nipKepsek && <p className="text-xs text-gray-500">NIP: {peng.nipKepsek}</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500">Bendahara</p>
-            <p className="font-medium text-gray-800">{pengaturan.bendahara || '(Belum diatur)'}</p>
-            {pengaturan.nipBendahara && <p className="text-xs text-gray-500">NIP: {pengaturan.nipBendahara}</p>}
+            <p className="font-medium text-gray-800">{peng.bendahara || '(Belum diatur)'}</p>
+            {peng.nipBendahara && <p className="text-xs text-gray-500">NIP: {peng.nipBendahara}</p>}
           </div>
         </div>
       </div>
