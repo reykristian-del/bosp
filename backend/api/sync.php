@@ -4,7 +4,46 @@
  * Untuk sinkronisasi data dari localStorage ke MySQL
  */
 
-require_once __DIR__ . '/../config.php';
+// Enable error reporting untuk debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/sync_error.log');
+
+// Custom error handler
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error: [$errno] $errstr in $errfile on line $errline");
+    return false; // Let PHP handle it too
+});
+
+// Custom exception handler
+set_exception_handler(function($exception) {
+    error_log("PHP Exception: " . $exception->getMessage() . " in " . $exception->getFile() . ":" . $exception->getLine());
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Server error: ' . $exception->getMessage(),
+        'file' => basename($exception->getFile()),
+        'line' => $exception->getLine(),
+        'trace' => $exception->getTraceAsString()
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit();
+});
+
+try {
+    require_once __DIR__ . '/config.php';
+} catch (Exception $e) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Failed to load config: ' . $e->getMessage(),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine()
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit();
+}
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -23,6 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     $db = Database::getInstance()->getConnection();
     $input = getInput();
+    
+    // Log request untuk debugging
+    error_log("Sync request received. Data size: " . strlen(json_encode($input)) . " bytes");
     
     $result = [
         'transaksi' => ['success' => 0, 'failed' => 0, 'errors' => []],
