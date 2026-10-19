@@ -25,16 +25,52 @@
  * GET    /api/laporan/bulanan    - Laporan per bulan
  */
 
+// Enable error reporting untuk debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Jangan tampilkan error di output
+ini_set('log_errors', 1);
+
+// Set headers
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Handle preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Function untuk response JSON
+function sendJsonResponse($data, $statusCode = 200) {
+    http_response_code($statusCode);
+    echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
 require_once __DIR__ . '/../config.php';
 
-// Health check endpoint
-if ($_SERVER['REQUEST_URI'] === '/api/health' || $_SERVER['REQUEST_URI'] === '/api/health/') {
+// Health check endpoint - perbaiki path matching untuk subfolder
+$uri = $_SERVER['REQUEST_URI'];
+$path = parse_url($uri, PHP_URL_PATH);
+
+// Check jika request ke /health atau /bosp/api/health
+if (preg_match('#/health/?$#', $path)) {
     try {
         $db = Database::getInstance()->getConnection();
         $stmt = $db->query("SELECT 1");
-        jsonResponse(['status' => 'ok', 'message' => 'API dan database terhubung', 'timestamp' => date('Y-m-d H:i:s')]);
+        sendJsonResponse([
+            'status' => 'ok', 
+            'message' => 'API dan database terhubung', 
+            'timestamp' => date('Y-m-d H:i:s'),
+            'path' => $path
+        ]);
     } catch (Exception $e) {
-        jsonResponse(['status' => 'error', 'message' => 'Database tidak terhubung: ' . $e->getMessage()], 500);
+        sendJsonResponse([
+            'status' => 'error', 
+            'message' => 'Database tidak terhubung: ' . $e->getMessage()
+        ], 500);
     }
 }
 

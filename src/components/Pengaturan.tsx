@@ -12,8 +12,28 @@ export default function Pengaturan() {
   const [syncing, setSyncing] = useState(false);
 
   const checkAPI = async () => {
-    const result = await checkHealth();
-    setApiStatus(result);
+    setApiStatus({ status: 'loading', message: 'Checking...' });
+    
+    try {
+      const result = await checkHealth();
+      setApiStatus(result);
+      
+      // Log detail untuk debugging
+      console.log('🔍 API Health Check Result:', result);
+      
+      // Tampilkan alert dengan detail
+      if (result.status === 'ok') {
+        alert(`✅ API Connected!\n\nStatus: ${result.status}\nMessage: ${result.message}`);
+      } else {
+        alert(`❌ API Error!\n\nStatus: ${result.status}\nMessage: ${result.message}\n\nCheck browser console (F12) for details.`);
+      }
+    } catch (error) {
+      console.error('❌ Health check error:', error);
+      setApiStatus({ 
+        status: 'error', 
+        message: 'Unexpected error: ' + (error instanceof Error ? error.message : 'Unknown error')
+      });
+    }
   };
 
   const handleSync = async () => {

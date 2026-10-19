@@ -276,8 +276,70 @@ export async function fetchLaporanRingkasan(tahun: string, bulan?: string): Prom
 
 export async function checkHealth(): Promise<{ status: string; message: string }> {
   try {
-    return await apiRequest<{ status: string; message: string }>('/health');
+    log('🔍 Checking API health...');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), APP_CONFIG.API_TIMEOUT);
+    
+    // Gunakan health.php yang lebih sederhana dan robust
+    const url = `${API_BASE}/health.php`;
+    log(`📡 Health check URL: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    log(`📥 Health check response: ${response.status} ${response.statusText}`);
+    
+    // Get response text first
+    const responseText = await response.text();
+    log(`📝 Response body: ${responseText.substring(0, 200)}`);
+    
+    // Check if response is empty
+    if (!responseText || responseText.trim() === '') {
+      return { 
+        status: 'offline', 
+        message: 'API mengembalikan response kosong' 
+      };
+    }
+    
+    // Try to parse as JSON
+    try {
+      const data = JSON.parse(responseText);
+      log(`✅ Health check success:`, data);
+      return { 
+        status: data.status || 'ok', 
+        message: data.message || 'API terhubung' 
+      };
+    } catch (parseError) {
+      log(`❌ Failed to parse JSON:`, parseError);
+      log(`📄 Raw response:`, responseText);
+      
+      // Return error with actual response
+      return { 
+        status: 'error', 
+        message: `API tidak mengembalikan JSON valid. Response: ${responseText.substring(0, 100)}` 
+      };
+    }
   } catch (error) {
+    log(`❌ Health check failed:`, error);
+    
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return { status: 'offline', message: 'Request timeout' };
+      }
+      if (error.message.includes('Failed to fetch')) {
+        return { status: 'offline', message: 'Tidak bisa terhubung ke API. Pastikan backend sudah di-upload.' };
+      }
+      return { status: 'offline', message: error.message };
+    }
+    
     return { status: 'offline', message: 'API tidak tersedia' };
   }
 }
