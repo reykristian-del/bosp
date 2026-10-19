@@ -29,8 +29,10 @@ export function useTransaksi() {
     
     try {
       const result = await fetchTransaksi();
-      log('✅ Transaksi loaded:', result.length, 'records');
-      setData(result);
+      // Pastikan result adalah array
+      const transaksiArray = Array.isArray(result) ? result : [];
+      log('✅ Transaksi loaded:', transaksiArray.length, 'records');
+      setData(transaksiArray);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       log('❌ Error loading transaksi:', errorMsg);
@@ -101,8 +103,10 @@ export function useBuktiKas() {
     
     try {
       const result = await fetchBuktiKas();
-      log('✅ Bukti kas loaded:', result.length, 'records');
-      setData(result);
+      // Pastikan result adalah array
+      const buktiArray = Array.isArray(result) ? result : [];
+      log('✅ Bukti kas loaded:', buktiArray.length, 'records');
+      setData(buktiArray);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       log('❌ Error loading bukti kas:', errorMsg);

@@ -3,19 +3,22 @@ import { useTransaksi, useSaldo, usePengaturan } from '../hooks';
 import { formatRupiah } from '../utils';
 
 export default function Dashboard() {
-  const { data: transaksi, loading: loadingTransaksi } = useTransaksi();
+  const { data: transaksi = [], loading: loadingTransaksi } = useTransaksi();
   const { data: saldo, loading: loadingSaldo, update: updateSaldo } = useSaldo();
   const { data: pengaturan, loading: loadingPengaturan } = usePengaturan();
   
   const [showSaldoModal, setShowSaldoModal] = useState(false);
   const [inputSaldo, setInputSaldo] = useState('');
 
+  // Pastikan transaksi selalu array
+  const transaksiArray = Array.isArray(transaksi) ? transaksi : [];
+
   const saldoAwal = saldo?.jumlah || 0;
-  const totalMasuk = transaksi.filter(t => t.jenis === 'masuk').reduce((sum, t) => sum + t.jumlah, 0);
-  const totalKeluar = transaksi.filter(t => t.jenis === 'keluar').reduce((sum, t) => sum + t.jumlah, 0);
+  const totalMasuk = transaksiArray.filter(t => t.jenis === 'masuk').reduce((sum, t) => sum + t.jumlah, 0);
+  const totalKeluar = transaksiArray.filter(t => t.jenis === 'keluar').reduce((sum, t) => sum + t.jumlah, 0);
   const saldoAkhir = saldoAwal + totalMasuk - totalKeluar;
 
-  const transaksiTerakhir = [...transaksi].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 5);
+  const transaksiTerakhir = [...transaksiArray].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 5);
 
   // Default values if pengaturan is null
   const defaultPengaturan = {
@@ -46,14 +49,14 @@ export default function Dashboard() {
   };
 
   // Kategori breakdown
-  const kategoriData = transaksi
+  const kategoriData = transaksiArray
     .filter(t => t.jenis === 'keluar')
     .reduce((acc, t) => {
       acc[t.kategori] = (acc[t.kategori] || 0) + t.jumlah;
       return acc;
     }, {} as Record<string, number>);
 
-  const transaksiTanpaBukti = transaksi.filter(t => t.jenis === 'keluar' && !t.statusBukti).length;
+  const transaksiTanpaBukti = transaksiArray.filter(t => t.jenis === 'keluar' && !t.statusBukti).length;
 
   return (
     <div className="space-y-6">

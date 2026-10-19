@@ -276,7 +276,10 @@ export default function Transaksi() {
     }
   };
 
-  const filtered = transaksi
+  // Pastikan transaksi selalu array
+  const transaksiArray = Array.isArray(transaksi) ? transaksi : [];
+  
+  const filtered = transaksiArray
     .filter(t => filter === 'semua' || t.jenis === filter)
     .filter(t => t.uraian.toLowerCase().includes(search.toLowerCase()) || t.noBukti.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
