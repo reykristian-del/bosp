@@ -46,15 +46,31 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     
     log(`📥 Response: ${response.status} ${response.statusText}`);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      log(`❌ Error response:`, errorText);
-      throw new Error(`API Error: ${response.status} ${response.statusText}\nURL: ${url}\nResponse: ${errorText}`);
+    // Baca response sebagai text dulu
+    const responseText = await response.text();
+    log(`📝 Response body:`, responseText.substring(0, 500));
+    
+    // Cek apakah response kosong
+    if (!responseText || responseText.trim() === '') {
+      throw new Error(`API mengembalikan response kosong\nURL: ${url}\nStatus: ${response.status}`);
     }
     
-    const data = await response.json();
-    log(`✅ Success:`, data);
-    return data;
+    // Cek HTTP error
+    if (!response.ok) {
+      log(`❌ Error response:`, responseText);
+      throw new Error(`API Error: ${response.status} ${response.statusText}\nURL: ${url}\nResponse: ${responseText.substring(0, 200)}`);
+    }
+    
+    // Coba parse sebagai JSON
+    try {
+      const data = JSON.parse(responseText);
+      log(`✅ Success:`, data);
+      return data;
+    } catch (parseError) {
+      log(`❌ JSON parse error:`, parseError);
+      log(`📄 Raw response:`, responseText);
+      throw new Error(`API tidak mengembalikan JSON valid\nURL: ${url}\nResponse: ${responseText.substring(0, 200)}`);
+    }
   } catch (error) {
     clearTimeout(timeoutId);
     log(`❌ Request failed:`, error);
@@ -349,7 +365,7 @@ export async function checkHealth(): Promise<{ status: string; message: string }
 export async function syncLocalToMySQL(): Promise<{ success: boolean; message: string; details?: any }> {
   try {
     console.log('🔄 Starting sync to MySQL...');
-    console.log('📍 API URL:', `${API_BASE}/sync`);
+    console.log('📍 API URL:', `${API_BASE}/sync.php`);
     
     // Prepare all data
     const syncData = {
@@ -367,19 +383,28 @@ export async function syncLocalToMySQL(): Promise<{ success: boolean; message: s
     });
     
     // Use dedicated sync endpoint
-    const result = await apiRequest<{ success: boolean; message: string; result: any }>('/sync', {
+    const result = await apiRequest<{ success: boolean; message: string; result?: any; error?: string }>('/sync.php', {
       method: 'POST',
       body: JSON.stringify(syncData),
     });
     
     console.log('✅ Sync result:', result);
     
+    // Validasi result
+    if (!result || typeof result !== 'object') {
+      return { success: false, message: 'Sync gagal: Response dari server tidak valid' };
+    }
+    
     if (result.success) {
       const r = result.result;
-      const message = `Sync berhasil! Transaksi: ${r.transaksi.success}, Bukti Kas: ${r.bukti_kas.success}`;
+      if (!r) {
+        return { success: true, message: 'Sync berhasil!', details: null };
+      }
+      const message = `Sync berhasil! Transaksi: ${r.transaksi?.success || 0}, Bukti Kas: ${r.bukti_kas?.success || 0}`;
       return { success: true, message, details: r };
     } else {
-      return { success: false, message: 'Sync gagal: ' + (result as any).error };
+      const errorMsg = result.error || result.message || 'Unknown error dari server';
+      return { success: false, message: 'Sync gagal: ' + errorMsg };
     }
   } catch (error) {
     console.error('❌ Sync error:', error);
@@ -387,13 +412,25 @@ export async function syncLocalToMySQL(): Promise<{ success: boolean; message: s
     // Provide detailed error message
     let errorMessage = 'Sync gagal';
     if (error instanceof Error) {
-      if (error.message.includes('404')) {
-        errorMessage = 'Endpoint /sync tidak ditemukan. Pastikan file sync.php sudah di-upload ke folder /api/';
-      } else if (error.message.includes('Failed to fetch')) {
+      const errMsg = error.message;
+      
+      if (errMsg.includes('404')) {
+        errorMessage = 'Endpoint /sync.php tidak ditemukan. Pastikan file sync.php sudah di-upload ke folder /api/';
+      } else if (errMsg.includes('500')) {
+        errorMessage = 'Server error (500). Cek error log di sync_error.log untuk detail.';
+      } else if (errMsg.includes('Failed to fetch')) {
         errorMessage = 'Tidak bisa terhubung ke server. Pastikan backend PHP sudah di-upload dan URL API benar.';
+      } else if (errMsg.includes('JSON valid')) {
+        errorMessage = 'Server tidak mengembalikan JSON valid. Cek error log di sync_error.log.';
+      } else if (errMsg.includes('response kosong')) {
+        errorMessage = 'Server mengembalikan response kosong. Cek error log di sync_error.log.';
+      } else if (errMsg.includes('AbortError') || errMsg.includes('timeout')) {
+        errorMessage = 'Request timeout. Server terlalu lama merespons.';
       } else {
-        errorMessage = 'Sync gagal: ' + error.message;
+        errorMessage = 'Sync gagal: ' + errMsg;
       }
+    } else {
+      errorMessage = 'Sync gagal: Unknown error';
     }
     
     return { success: false, message: errorMessage };

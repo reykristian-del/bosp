@@ -39,12 +39,32 @@ export default function Pengaturan() {
   const handleSync = async () => {
     if (!confirm('Sync semua data dari localStorage ke MySQL?')) return;
     setSyncing(true);
-    const result = await syncLocalToMySQL();
-    setSyncing(false);
-    if (result.success) {
-      alert('Sync berhasil!');
-    } else {
-      alert('Sync gagal: ' + result.message);
+    
+    try {
+      const result = await syncLocalToMySQL();
+      setSyncing(false);
+      
+      console.log('📊 Sync result:', result);
+      
+      // Validasi result
+      if (!result || typeof result !== 'object') {
+        alert('❌ Sync gagal: Response tidak valid dari server');
+        return;
+      }
+      
+      if (result.success) {
+        const message = result.message || 'Sync berhasil!';
+        alert(`✅ ${message}`);
+      } else {
+        const errorMessage = result.message || 'Unknown error';
+        alert(`❌ ${errorMessage}`);
+      }
+    } catch (error) {
+      setSyncing(false);
+      console.error('❌ Sync error:', error);
+      
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`❌ Sync gagal: ${errorMsg}`);
     }
   };
 
