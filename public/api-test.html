@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test - BOSP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e40af;
+            border-bottom: 3px solid #1e40af;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        button {
+            background: #1e40af;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1e3a8a;
+        }
+        pre {
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .status.ok {
+            background: #10b981;
+            color: white;
+        }
+        .status.fail {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 API Connection Test</h1>
+        <p>Test koneksi API untuk aplikasi BOSP di <strong>credo.my.id/bosp/</strong></p>
+
+        <div class="test-section info">
+            <h3>📋 Informasi</h3>
+            <p><strong>Base URL:</strong> <code id="baseUrl"></code></p>
+            <p><strong>Current URL:</strong> <code id="currentUrl"></code></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Koneksi</h3>
+            <button onclick="testHealth()">Test /api/health</button>
+            <button onclick="testSimple()">Test /api/test-simple.php</button>
+            <button onclick="testSync()">Test /api/sync.php</button>
+            <button onclick="testAll()">Test Semua</button>
+        </div>
+
+        <div id="results"></div>
+
+        <div class="test-section info">
+            <h3>📖 Panduan Troubleshooting</h3>
+            <ol>
+                <li>Jika semua test gagal, pastikan folder <code>api/</code> sudah di-upload ke <code>public_html/bosp/api/</code></li>
+                <li>Jika test-simple.php berhasil tapi sync.php error 500, cek error log di <code>sync_error.log</code></li>
+                <li>Jika error 404, pastikan file <code>.htaccess</code> ada di folder <code>api/</code></li>
+                <li>Jika error CORS, pastikan header CORS sudah di-set di <code>config.php</code></li>
+                <li>Cek console browser (F12) untuk detail error</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = window.location.origin + '/bosp/api';
+        document.getElementById('baseUrl').textContent = baseUrl;
+        document.getElementById('currentUrl').textContent = window.location.href;
+
+        function addResult(title, status, message, details = '') {
+            const resultsDiv = document.getElementById('results');
+            const statusClass = status === 'success' ? 'success' : 'error';
+            const statusIcon = status === 'success' ? '✅' : '❌';
+            
+            const html = `
+                <div class="test-section ${statusClass}">
+                    <h3>${statusIcon} ${title}</h3>
+                    <p><strong>Status:</strong> <span class="status ${status === 'success' ? 'ok' : 'fail'}">${status}</span></p>
+                    <p><strong>Message:</strong> ${message}</p>
+                    ${details ? `<pre>${details}</pre>` : ''}
+                </div>
+            `;
+            resultsDiv.innerHTML += html;
+        }
+
+        async function testHealth() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek /api/health...');
+            
+            try {
+                const response = await fetch(baseUrl + '/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(
+                        'Health Check',
+                        'success',
+                        'API health check berhasil',
+                        JSON.stringify(data, null, 2)
+                    );
+                } else {
+                    addResult(
+                        'Health Check',
+                        'error',
+                        `HTTP ${response.status}: ${response.statusText}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'Health Check',
+                    'error',
+                    'Failed to connect',
+                    error.message
+                );
+            }
+        }
+
+        async function testSimple() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek /api/test-simple.php...');
+            
+            try {
+                const response = await fetch(baseUrl + '/test-simple.php');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(
+                        'Simple Test',
+                        'success',
+                        'Simple test berhasil',
+                        JSON.stringify(data, null, 2)
+                    );
+                } else {
+                    addResult(
+                        'Simple Test',
+                        'error',
+                        `HTTP ${response.status}: ${response.statusText}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'Simple Test',
+                    'error',
+                    'Failed to connect',
+                    error.message
+                );
+            }
+        }
+
+        async function testSync() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek /api/sync.php...');
+            
+            try {
+                const testData = {
+                    transaksi: [],
+                    bukti_kas: [],
+                    pengaturan: {
+                        namaSekolah: 'Test',
+                        npsn: '123'
+                    },
+                    saldo: {
+                        tanggal: new Date().toISOString().split('T')[0],
+                        jumlah: 0,
+                        keterangan: 'Test'
+                    }
+                };
+                
+                const response = await fetch(baseUrl + '/sync.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    addResult(
+                        'Sync Test',
+                        'success',
+                        'Sync test berhasil',
+                        JSON.stringify(data, null, 2)
+                    );
+                } else {
+                    addResult(
+                        'Sync Test',
+                        'error',
+                        `HTTP ${response.status}: ${response.statusText}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'Sync Test',
+                    'error',
+                    'Failed to connect',
+                    error.message
+                );
+            }
+        }
+
+        async function testAll() {
+            document.getElementById('results').innerHTML = '';
+            await testHealth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testSimple();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testSync();
+        }
+    </script>
+</body>
+</html>
