@@ -1,10 +1,11 @@
 # .htaccess untuk cPanel - Sistem Pembukuan BOSP
 # SMP Negeri 1 Tulang Bawang Barat
+# Aplikasi berada di subfolder /bosp/
 
 # Aktifkan Rewrite Engine
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
+    RewriteBase /bosp/
 
     # Redirect HTTP ke HTTPS (jika diperlukan)
     # RewriteCond %{HTTPS} off

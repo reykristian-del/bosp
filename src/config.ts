@@ -7,12 +7,8 @@ export const APP_CONFIG = {
   // Mode penyimpanan: 'local' atau 'mysql'
   STORAGE_MODE: 'mysql' as 'local' | 'mysql',
   
-  // URL Backend API (sesuaikan dengan domain hosting Anda)
-  // Contoh:
-  // - '/api' jika di root domain
-  // - '/bosp/api' jika di subfolder /bosp/
-  // - 'https://domain.com/api' jika di domain berbeda
-  API_BASE_URL: '/api',
+  // URL Backend API - APLIKASI BERADA DI SUBFOLDER /bosp/
+  API_BASE_URL: '/bosp/api',
   
   // Debug mode - tampilkan log di console
   DEBUG: true,
