@@ -1,34 +1,14 @@
 <?php
 /**
- * API Router - Sistem Pembukuan BOSP
- * SMP Negeri 1 Tulang Bawang Barat
- * 
- * Endpoint:
- * GET    /api/health             - Health check
- * GET    /api/transaksi          - List semua transaksi
- * POST   /api/transaksi          - Tambah transaksi
- * PUT    /api/transaksi/{id}     - Update transaksi
- * DELETE /api/transaksi/{id}     - Hapus transaksi
- * 
- * GET    /api/bukti-kas          - List semua bukti kas
- * POST   /api/bukti-kas          - Buat bukti kas
- * DELETE /api/bukti-kas/{id}     - Hapus bukti kas
- * 
- * GET    /api/pengaturan         - Ambil pengaturan
- * PUT    /api/pengaturan         - Update pengaturan
- * 
- * GET    /api/saldo              - Ambil saldo awal
- * PUT    /api/saldo              - Update saldo awal
- * 
- * GET    /api/laporan/ringkasan  - Laporan ringkasan
- * GET    /api/laporan/kategori   - Laporan per kategori
- * GET    /api/laporan/bulanan    - Laporan per bulan
+ * API Router - Simplified Version
+ * Lebih robust untuk subfolder /bosp/api/
  */
 
-// Enable error reporting untuk debugging
+// Enable error reporting
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Jangan tampilkan error di output
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error.log');
 
 // Set headers
 header('Content-Type: application/json; charset=utf-8');
@@ -42,537 +22,347 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Function untuk response JSON
-function sendJsonResponse($data, $statusCode = 200) {
-    http_response_code($statusCode);
-    echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+// Load config
+try {
+    require_once __DIR__ . '/config.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Failed to load config: ' . $e->getMessage()
+    ]);
     exit();
 }
 
-require_once __DIR__ . '/../config.php';
+// Get request path
+$requestUri = $_SERVER['REQUEST_URI'];
+$scriptName = $_SERVER['SCRIPT_NAME'];
 
-// Health check endpoint - perbaiki path matching untuk subfolder
-$uri = $_SERVER['REQUEST_URI'];
-$path = parse_url($uri, PHP_URL_PATH);
+// Remove query string
+$path = parse_url($requestUri, PHP_URL_PATH);
 
-// Check jika request ke /health atau /bosp/api/health
-if (preg_match('#/health/?$#', $path)) {
-    try {
-        $db = Database::getInstance()->getConnection();
-        $stmt = $db->query("SELECT 1");
-        sendJsonResponse([
-            'status' => 'ok', 
-            'message' => 'API dan database terhubung', 
-            'timestamp' => date('Y-m-d H:i:s'),
-            'path' => $path
-        ]);
-    } catch (Exception $e) {
-        sendJsonResponse([
-            'status' => 'error', 
-            'message' => 'Database tidak terhubung: ' . $e->getMessage()
-        ], 500);
-    }
-}
-
-$db = Database::getInstance()->getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
-$uri = $_SERVER['REQUEST_URI'];
-$path = parse_url($uri, PHP_URL_PATH);
-
-// Simple router
+// Remove base path (/bosp/api or /api)
+$path = preg_replace('#^/bosp/api#', '', $path);
 $path = preg_replace('#^/api#', '', $path);
-$path = rtrim($path, '/');
-$segments = explode('/', trim($path, '/'));
+$path = trim($path, '/');
 
-$resource = $segments[0] ?? '';
-$id = $segments[1] ?? null;
-$action = $segments[1] ?? null;
+// Get HTTP method
+$method = $_SERVER['REQUEST_METHOD'];
 
+// Get database connection
 try {
-    switch ($resource) {
-        case 'transaksi':
-            handleTransaksi($db, $method, $id);
-            break;
-        case 'bukti-kas':
-            handleBuktiKas($db, $method, $id);
-            break;
-        case 'pengaturan':
-            handlePengaturan($db, $method);
-            break;
-        case 'saldo':
-            handleSaldo($db, $method);
-            break;
-        case 'laporan':
-            handleLaporan($db, $method, $action);
-            break;
-        default:
-            jsonResponse([
-                'message' => 'API Sistem Pembukuan BOSP',
-                'school' => 'SMP Negeri 1 Tulang Bawang Barat',
-                'version' => '2.0.0',
-                'endpoints' => [
-                    'health' => 'GET /api/health',
-                    'transaksi' => 'GET/POST/PUT/DELETE /api/transaksi',
-                    'bukti_kas' => 'GET/POST/DELETE /api/bukti-kas',
-                    'pengaturan' => 'GET/PUT /api/pengaturan',
-                    'saldo' => 'GET/PUT /api/saldo',
-                    'laporan' => 'GET /api/laporan/{ringkasan|kategori|bulanan}'
-                ]
-            ]);
-    }
+    $db = Database::getInstance()->getConnection();
 } catch (Exception $e) {
-    jsonResponse(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Database connection failed: ' . $e->getMessage()
+    ]);
+    exit();
 }
 
-/**
- * Handle Transaksi endpoints
- */
-function handleTransaksi($db, $method, $id) {
-    switch ($method) {
-        case 'GET':
-            if ($id) {
-                $stmt = $db->prepare("SELECT * FROM transaksi WHERE id = ?");
-                $stmt->execute([$id]);
-                $result = $stmt->fetch();
-                if (!$result) jsonResponse(['error' => 'Transaksi tidak ditemukan'], 404);
-                jsonResponse($result);
-            } else {
-                $where = "1=1";
-                $params = [];
-                
-                if (isset($_GET['jenis'])) {
-                    $where .= " AND jenis = ?";
-                    $params[] = $_GET['jenis'];
-                }
-                if (isset($_GET['tahun'])) {
-                    $where .= " AND YEAR(tanggal) = ?";
-                    $params[] = $_GET['tahun'];
-                }
-                if (isset($_GET['bulan'])) {
-                    $where .= " AND MONTH(tanggal) = ?";
-                    $params[] = $_GET['bulan'];
-                }
-                if (isset($_GET['status_bukti'])) {
-                    $where .= " AND status_bukti = ?";
-                    $params[] = $_GET['status_bukti'];
-                }
-                
-                $stmt = $db->prepare("SELECT * FROM transaksi WHERE $where ORDER BY tanggal DESC");
-                $stmt->execute($params);
-                jsonResponse($stmt->fetchAll());
-            }
-            break;
-            
-        case 'POST':
-            $input = getInput();
-            validateRequired($input, ['tanggal', 'no_bukti', 'uraian', 'jenis', 'jumlah']);
-            
-            $id = $input['id'] ?? generateId();
-            
-            // Check if already exists
-            $stmt = $db->prepare("SELECT id FROM transaksi WHERE id = ?");
-            $stmt->execute([$id]);
-            if ($stmt->fetch()) {
-                // Update existing
-                $stmt = $db->prepare("
-                    UPDATE transaksi SET 
-                        tanggal = ?, no_bukti = ?, uraian = ?, kategori = ?, kode_rekening = ?, 
-                        jumlah = ?, pajak = ?, jenis = ?, keterangan = ?, penerima = ?, status_bukti = ?
-                    WHERE id = ?
-                ");
-                $stmt->execute([
-                    $input['tanggal'],
-                    $input['no_bukti'],
-                    $input['uraian'],
-                    $input['kategori'] ?? '',
-                    $input['kode_rekening'] ?? '',
-                    $input['jumlah'],
-                    $input['pajak'] ?? 0,
-                    $input['jenis'],
-                    $input['keterangan'] ?? '',
-                    $input['penerima'] ?? '',
-                    $input['status_bukti'] ?? false,
-                    $id
-                ]);
-            } else {
-                // Insert new
-                $stmt = $db->prepare("
-                    INSERT INTO transaksi (id, tanggal, no_bukti, uraian, kategori, kode_rekening, jumlah, pajak, jenis, keterangan, penerima, status_bukti)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    $id,
-                    $input['tanggal'],
-                    $input['no_bukti'],
-                    $input['uraian'],
-                    $input['kategori'] ?? '',
-                    $input['kode_rekening'] ?? '',
-                    $input['jumlah'],
-                    $input['pajak'] ?? 0,
-                    $input['jenis'],
-                    $input['keterangan'] ?? '',
-                    $input['penerima'] ?? '',
-                    $input['status_bukti'] ?? false,
-                ]);
-            }
-            
-            jsonResponse(['id' => $id, 'message' => 'Transaksi berhasil disimpan'], 201);
-            break;
-            
-        case 'PUT':
-            if (!$id) jsonResponse(['error' => 'ID diperlukan'], 400);
-            $input = getInput();
-            
-            $fields = [];
-            $params = [];
-            $allowed = ['tanggal', 'no_bukti', 'uraian', 'kategori', 'kode_rekening', 'jumlah', 'pajak', 'jenis', 'keterangan', 'penerima', 'status_bukti'];
-            
-            foreach ($allowed as $field) {
-                if (isset($input[$field])) {
-                    $fields[] = "$field = ?";
-                    $params[] = $input[$field];
-                }
-            }
-            
-            if (empty($fields)) jsonResponse(['error' => 'Tidak ada data untuk diupdate'], 400);
-            
-            $params[] = $id;
-            $stmt = $db->prepare("UPDATE transaksi SET " . implode(', ', $fields) . " WHERE id = ?");
-            $stmt->execute($params);
-            
-            jsonResponse(['message' => 'Transaksi berhasil diupdate']);
-            break;
-            
-        case 'DELETE':
-            if (!$id) jsonResponse(['error' => 'ID diperlukan'], 400);
-            $stmt = $db->prepare("DELETE FROM transaksi WHERE id = ?");
-            $stmt->execute([$id]);
-            jsonResponse(['message' => 'Transaksi berhasil dihapus']);
-            break;
-            
-        default:
-            jsonResponse(['error' => 'Method tidak didukung'], 405);
+// Route requests
+try {
+    // Health check
+    if ($path === 'health' || $path === 'health/') {
+        echo json_encode([
+            'status' => 'ok',
+            'message' => 'API is working',
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit();
     }
-}
-
-/**
- * Handle Bukti Kas endpoints
- */
-function handleBuktiKas($db, $method, $id) {
-    switch ($method) {
-        case 'GET':
-            if ($id) {
-                $stmt = $db->prepare("SELECT * FROM bukti_kas WHERE id = ?");
-                $stmt->execute([$id]);
-                $bukti = $stmt->fetch();
-                if (!$bukti) jsonResponse(['error' => 'Bukti kas tidak ditemukan'], 404);
-                
-                // Get items
-                $stmt = $db->prepare("SELECT * FROM bukti_kas_item WHERE bukti_kas_id = ?");
-                $stmt->execute([$id]);
-                $bukti['items'] = $stmt->fetchAll();
-                
-                // Get dokumen
-                $stmt = $db->prepare("SELECT * FROM dokumen_pendukung WHERE bukti_kas_id = ?");
-                $stmt->execute([$id]);
-                $bukti['dokumen'] = $stmt->fetchAll();
-                
-                jsonResponse($bukti);
-            } else {
-                $stmt = $db->query("SELECT * FROM bukti_kas ORDER BY tanggal DESC");
-                $list = $stmt->fetchAll();
-                
-                // Get items for each
-                foreach ($list as &$bukti) {
-                    $stmt = $db->prepare("SELECT * FROM bukti_kas_item WHERE bukti_kas_id = ?");
-                    $stmt->execute([$bukti['id']]);
-                    $bukti['items'] = $stmt->fetchAll();
-                    
-                    $stmt = $db->prepare("SELECT nama_dokumen FROM dokumen_pendukung WHERE bukti_kas_id = ?");
-                    $stmt->execute([$bukti['id']]);
-                    $bukti['dokumen_pendukung'] = array_column($stmt->fetchAll(), 'nama_dokumen');
-                }
-                
-                jsonResponse($list);
-            }
-            break;
-            
-        case 'POST':
-            $input = getInput();
-            validateRequired($input, ['transaksi_id', 'no_bukti', 'tanggal', 'jumlah_uang']);
-            
-            $id = $input['id'] ?? generateId();
-            
-            // Check if already exists
-            $stmt = $db->prepare("SELECT id FROM bukti_kas WHERE id = ?");
-            $stmt->execute([$id]);
-            if ($stmt->fetch()) {
-                // Delete old data first
-                $stmt = $db->prepare("DELETE FROM bukti_kas_item WHERE bukti_kas_id = ?");
-                $stmt->execute([$id]);
-                $stmt = $db->prepare("DELETE FROM dokumen_pendukung WHERE bukti_kas_id = ?");
-                $stmt->execute([$id]);
-                $stmt = $db->prepare("DELETE FROM bukti_kas WHERE id = ?");
-                $stmt->execute([$id]);
+    
+    // Transaksi endpoints
+    if (preg_match('#^transaksi/?$#', $path)) {
+        if ($method === 'GET') {
+            $stmt = $db->query("SELECT * FROM transaksi ORDER BY tanggal DESC");
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($data);
+            exit();
+        } elseif ($method === 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
             }
             
-            // Insert bukti kas
             $stmt = $db->prepare("
-                INSERT INTO bukti_kas (id, transaksi_id, no_bukti, tanggal, telah_terima_dari, penerima, jumlah_uang, terbilang, untuk_pembayaran, kategori, kode_rekening)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO transaksi (id, tanggal, no_bukti, uraian, kategori, kode_rekening, jumlah, pajak, jenis, keterangan, penerima, status_bukti, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             $stmt->execute([
-                $id,
-                $input['transaksi_id'],
-                $input['no_bukti'],
+                $input['id'] ?? uniqid(),
                 $input['tanggal'],
-                $input['telah_terima_dari'] ?? '',
-                $input['penerima'] ?? '',
-                $input['jumlah_uang'],
-                $input['terbilang'] ?? '',
-                $input['untuk_pembayaran'] ?? '',
+                $input['noBukti'] ?? '',
+                $input['uraian'],
                 $input['kategori'] ?? '',
-                $input['kode_rekening'] ?? '',
+                $input['kodeRekening'] ?? '',
+                $input['jumlah'],
+                $input['pajak'] ?? 0,
+                $input['jenis'],
+                $input['keterangan'] ?? '',
+                $input['penerima'] ?? '',
+                $input['statusBukti'] ?? false
+            ]);
+            
+            echo json_encode(['success' => true, 'id' => $input['id'] ?? 'created']);
+            exit();
+        }
+    }
+    
+    // Transaksi by ID
+    if (preg_match('#^transaksi/([a-zA-Z0-9]+)$#', $path, $matches)) {
+        $id = $matches[1];
+        
+        if ($method === 'GET') {
+            $stmt = $db->prepare("SELECT * FROM transaksi WHERE id = ?");
+            $stmt->execute([$id]);
+            $data = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$data) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Transaksi not found']);
+                exit();
+            }
+            
+            echo json_encode($data);
+            exit();
+        } elseif ($method === 'PUT') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
+            }
+            
+            $fields = [];
+            $values = [];
+            
+            foreach ($input as $key => $value) {
+                $dbKey = $key;
+                // Convert camelCase to snake_case
+                if ($key === 'noBukti') $dbKey = 'no_bukti';
+                elseif ($key === 'kodeRekening') $dbKey = 'kode_rekening';
+                elseif ($key === 'statusBukti') $dbKey = 'status_bukti';
+                
+                $fields[] = "$dbKey = ?";
+                $values[] = $value;
+            }
+            
+            $values[] = $id;
+            $sql = "UPDATE transaksi SET " . implode(', ', $fields) . " WHERE id = ?";
+            $stmt = $db->prepare($sql);
+            $stmt->execute($values);
+            
+            echo json_encode(['success' => true]);
+            exit();
+        } elseif ($method === 'DELETE') {
+            $stmt = $db->prepare("DELETE FROM transaksi WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            echo json_encode(['success' => true]);
+            exit();
+        }
+    }
+    
+    // Bukti Kas endpoints
+    if (preg_match('#^bukti-kas/?$#', $path)) {
+        if ($method === 'GET') {
+            $stmt = $db->query("SELECT * FROM bukti_kas ORDER BY tanggal DESC");
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Get items for each bukti kas
+            foreach ($data as &$bukti) {
+                $stmt = $db->prepare("SELECT * FROM bukti_kas_item WHERE bukti_kas_id = ?");
+                $stmt->execute([$bukti['id']]);
+                $bukti['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                $stmt = $db->prepare("SELECT nama_dokumen FROM dokumen_pendukung WHERE bukti_kas_id = ?");
+                $stmt->execute([$bukti['id']]);
+                $bukti['dokumenPendukung'] = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'nama_dokumen');
+            }
+            
+            echo json_encode($data);
+            exit();
+        } elseif ($method === 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
+            }
+            
+            $stmt = $db->prepare("
+                INSERT INTO bukti_kas (id, transaksi_id, no_bukti, tanggal, telah_terima_dari, penerima, jumlah_uang, terbilang, untuk_pembayaran, kategori, kode_rekening, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $input['id'] ?? uniqid(),
+                $input['transaksiId'] ?? '',
+                $input['noBukti'] ?? '',
+                $input['tanggal'],
+                $input['telahTerimaDari'] ?? '',
+                $input['penerima'] ?? '',
+                $input['jumlahUang'],
+                $input['terbilang'] ?? '',
+                $input['untukPembayaran'] ?? '',
+                $input['kategori'] ?? '',
+                $input['kodeRekening'] ?? ''
             ]);
             
             // Insert items
-            if (isset($input['items']) && is_array($input['items'])) {
+            if (isset($input['items'])) {
                 $stmt = $db->prepare("
                     INSERT INTO bukti_kas_item (bukti_kas_id, kode_rekening, uraian, volume, satuan, harga_satuan, pajak, jumlah)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 foreach ($input['items'] as $item) {
                     $stmt->execute([
-                        $id,
-                        $item['kodeRekening'] ?? $item['kode_rekening'] ?? '',
+                        $input['id'],
+                        $item['kodeRekening'] ?? '',
                         $item['uraian'] ?? '',
                         $item['volume'] ?? '',
                         $item['satuan'] ?? '',
-                        $item['harga_satuan'] ?? $item['hargaSatuan'] ?? 0,
+                        $item['hargaSatuan'] ?? 0,
                         $item['pajak'] ?? 0,
-                        $item['jumlah'] ?? 0,
+                        $item['jumlah'] ?? 0
                     ]);
                 }
             }
             
             // Insert dokumen pendukung
-            if (isset($input['dokumen_pendukung']) && is_array($input['dokumen_pendukung'])) {
+            if (isset($input['dokumenPendukung'])) {
                 $stmt = $db->prepare("INSERT INTO dokumen_pendukung (bukti_kas_id, nama_dokumen) VALUES (?, ?)");
-                foreach ($input['dokumen_pendukung'] as $dok) {
-                    $stmt->execute([$id, $dok]);
+                foreach ($input['dokumenPendukung'] as $dok) {
+                    $stmt->execute([$input['id'], $dok]);
                 }
             }
             
-            // Update status transaksi
-            $stmt = $db->prepare("UPDATE transaksi SET status_bukti = TRUE WHERE id = ?");
-            $stmt->execute([$input['transaksi_id']]);
-            
-            jsonResponse(['id' => $id, 'message' => 'Bukti kas berhasil dibuat'], 201);
-            break;
-            
-        case 'DELETE':
-            if (!$id) jsonResponse(['error' => 'ID diperlukan'], 400);
-            
-            // Get bukti kas to update transaksi status
-            $stmt = $db->prepare("SELECT transaksi_id FROM bukti_kas WHERE id = ?");
-            $stmt->execute([$id]);
-            $bukti = $stmt->fetch();
-            
-            $stmt = $db->prepare("DELETE FROM bukti_kas WHERE id = ?");
-            $stmt->execute([$id]);
-            
-            // Reset status transaksi
-            if ($bukti) {
-                $stmt = $db->prepare("UPDATE transaksi SET status_bukti = FALSE WHERE id = ?");
-                $stmt->execute([$bukti['transaksi_id']]);
+            echo json_encode(['success' => true, 'id' => $input['id'] ?? 'created']);
+            exit();
+        }
+    }
+    
+    // Pengaturan endpoints
+    if (preg_match('#^pengaturan/?$#', $path)) {
+        if ($method === 'GET') {
+            $stmt = $db->query("SELECT * FROM pengaturan LIMIT 1");
+            $data = $stmt->fetch(PDO::FETCH_ASSOC);
+            echo json_encode($data ?: []);
+            exit();
+        } elseif ($method === 'PUT') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
             }
             
-            jsonResponse(['message' => 'Bukti kas berhasil dihapus']);
-            break;
-            
-        default:
-            jsonResponse(['error' => 'Method tidak didukung'], 405);
-    }
-}
-
-/**
- * Handle Pengaturan endpoints
- */
-function handlePengaturan($db, $method) {
-    switch ($method) {
-        case 'GET':
-            $stmt = $db->query("SELECT * FROM pengaturan ORDER BY id DESC LIMIT 1");
-            $result = $stmt->fetch();
-            jsonResponse($result ?: []);
-            break;
-            
-        case 'PUT':
-            $input = getInput();
-            $stmt = $db->query("SELECT id FROM pengaturan ORDER BY id DESC LIMIT 1");
+            // Check if exists
+            $stmt = $db->query("SELECT id FROM pengaturan LIMIT 1");
             $existing = $stmt->fetch();
             
             if ($existing) {
                 $fields = [];
-                $params = [];
-                $allowed = ['nama_sekolah', 'npsn', 'alamat', 'kelurahan', 'kecamatan', 'kabupaten', 'provinsi', 'kode_pos', 'telepon', 'email', 'kepala_sekolah', 'nip_kepsek', 'bendahara', 'nip_bendahara', 'tahun_anggaran', 'sumber_dana'];
+                $values = [];
                 
-                foreach ($allowed as $field) {
-                    if (isset($input[$field])) {
-                        $fields[] = "$field = ?";
-                        $params[] = $input[$field];
-                    }
+                foreach ($input as $key => $value) {
+                    $dbKey = $key;
+                    // Convert camelCase to snake_case
+                    if ($key === 'namaSekolah') $dbKey = 'nama_sekolah';
+                    elseif ($key === 'kepalaSekolah') $dbKey = 'kepala_sekolah';
+                    elseif ($key === 'nipKepsek') $dbKey = 'nip_kepsek';
+                    elseif ($key === 'nipBendahara') $dbKey = 'nip_bendahara';
+                    elseif ($key === 'tahunAnggaran') $dbKey = 'tahun_anggaran';
+                    elseif ($key === 'sumberDana') $dbKey = 'sumber_dana';
+                    elseif ($key === 'kodePos') $dbKey = 'kode_pos';
+                    
+                    $fields[] = "$dbKey = ?";
+                    $values[] = $value;
                 }
                 
-                if (!empty($fields)) {
-                    $params[] = $existing['id'];
-                    $stmt = $db->prepare("UPDATE pengaturan SET " . implode(', ', $fields) . " WHERE id = ?");
-                    $stmt->execute($params);
-                }
+                $values[] = $existing['id'];
+                $sql = "UPDATE pengaturan SET " . implode(', ', $fields) . " WHERE id = ?";
+                $stmt = $db->prepare($sql);
+                $stmt->execute($values);
             } else {
                 $stmt = $db->prepare("
                     INSERT INTO pengaturan (nama_sekolah, npsn, alamat, kelurahan, kecamatan, kabupaten, provinsi, kode_pos, telepon, email, kepala_sekolah, nip_kepsek, bendahara, nip_bendahara, tahun_anggaran, sumber_dana)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $input['nama_sekolah'] ?? '',
+                    $input['namaSekolah'] ?? '',
                     $input['npsn'] ?? '',
                     $input['alamat'] ?? '',
                     $input['kelurahan'] ?? '',
                     $input['kecamatan'] ?? '',
                     $input['kabupaten'] ?? '',
                     $input['provinsi'] ?? '',
-                    $input['kode_pos'] ?? '',
+                    $input['kodePos'] ?? '',
                     $input['telepon'] ?? '',
                     $input['email'] ?? '',
-                    $input['kepala_sekolah'] ?? '',
-                    $input['nip_kepsek'] ?? '',
+                    $input['kepalaSekolah'] ?? '',
+                    $input['nipKepsek'] ?? '',
                     $input['bendahara'] ?? '',
-                    $input['nip_bendahara'] ?? '',
-                    $input['tahun_anggaran'] ?? '',
-                    $input['sumber_dana'] ?? '',
+                    $input['nipBendahara'] ?? '',
+                    $input['tahunAnggaran'] ?? '',
+                    $input['sumberDana'] ?? ''
                 ]);
             }
             
-            jsonResponse(['message' => 'Pengaturan berhasil disimpan']);
-            break;
-            
-        default:
-            jsonResponse(['error' => 'Method tidak didukung'], 405);
-    }
-}
-
-/**
- * Handle Saldo endpoints
- */
-function handleSaldo($db, $method) {
-    switch ($method) {
-        case 'GET':
-            $tahun = $_GET['tahun'] ?? date('Y');
-            $stmt = $db->prepare("SELECT * FROM saldo_awal WHERE tahun_anggaran = ? ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$tahun]);
-            $result = $stmt->fetch();
-            jsonResponse($result ?: ['jumlah' => 0]);
-            break;
-            
-        case 'PUT':
-            $input = getInput();
-            $tahun = $input['tahun_anggaran'] ?? date('Y');
-            
-            // Check if exists
-            $stmt = $db->prepare("SELECT id FROM saldo_awal WHERE tahun_anggaran = ?");
-            $stmt->execute([$tahun]);
-            $existing = $stmt->fetch();
-            
-            if ($existing) {
-                $stmt = $db->prepare("UPDATE saldo_awal SET tanggal = ?, jumlah = ?, keterangan = ? WHERE id = ?");
-                $stmt->execute([$input['tanggal'], $input['jumlah'], $input['keterangan'] ?? '', $existing['id']]);
-            } else {
-                $stmt = $db->prepare("INSERT INTO saldo_awal (tanggal, jumlah, keterangan, tahun_anggaran) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$input['tanggal'], $input['jumlah'], $input['keterangan'] ?? '', $tahun]);
-            }
-            
-            jsonResponse(['message' => 'Saldo berhasil disimpan']);
-            break;
-            
-        default:
-            jsonResponse(['error' => 'Method tidak didukung'], 405);
-    }
-}
-
-/**
- * Handle Laporan endpoints
- */
-function handleLaporan($db, $method, $action) {
-    if ($method !== 'GET') {
-        jsonResponse(['error' => 'Method tidak didukung'], 405);
+            echo json_encode(['success' => true]);
+            exit();
+        }
     }
     
-    $tahun = $_GET['tahun'] ?? date('Y');
-    $bulan = $_GET['bulan'] ?? null;
-    
-    switch ($action) {
-        case 'ringkasan':
-            $where = "YEAR(tanggal) = ?";
-            $params = [$tahun];
-            if ($bulan) {
-                $where .= " AND MONTH(tanggal) = ?";
-                $params[] = $bulan;
+    // Saldo endpoints
+    if (preg_match('#^saldo/?$#', $path)) {
+        if ($method === 'GET') {
+            $stmt = $db->query("SELECT * FROM saldo_awal ORDER BY id DESC LIMIT 1");
+            $data = $stmt->fetch(PDO::FETCH_ASSOC);
+            echo json_encode($data ?: ['jumlah' => 0]);
+            exit();
+        } elseif ($method === 'PUT') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
             }
             
-            // Get saldo
-            $stmt = $db->prepare("SELECT jumlah FROM saldo_awal WHERE tahun_anggaran = ? ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$tahun]);
-            $saldo = $stmt->fetch();
-            $saldoAwal = $saldo ? $saldo['jumlah'] : 0;
-            
-            // Get totals
-            $stmt = $db->prepare("SELECT 
-                SUM(CASE WHEN jenis = 'masuk' THEN jumlah ELSE 0 END) as total_masuk,
-                SUM(CASE WHEN jenis = 'keluar' THEN jumlah ELSE 0 END) as total_keluar,
-                COUNT(*) as total_transaksi
-                FROM transaksi WHERE $where");
-            $stmt->execute($params);
-            $totals = $stmt->fetch();
-            
-            jsonResponse([
-                'saldo_awal' => (float)$saldoAwal,
-                'total_masuk' => (float)($totals['total_masuk'] ?? 0),
-                'total_keluar' => (float)($totals['total_keluar'] ?? 0),
-                'saldo_akhir' => (float)$saldoAwal + (float)($totals['total_masuk'] ?? 0) - (float)($totals['total_keluar'] ?? 0),
-                'total_transaksi' => (int)($totals['total_transaksi'] ?? 0),
+            $stmt = $db->prepare("
+                INSERT INTO saldo_awal (tanggal, jumlah, keterangan, tahun_anggaran)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE tanggal = VALUES(tanggal), jumlah = VALUES(jumlah), keterangan = VALUES(keterangan)
+            ");
+            $stmt->execute([
+                $input['tanggal'],
+                $input['jumlah'],
+                $input['keterangan'] ?? '',
+                $input['tahunAnggaran'] ?? date('Y')
             ]);
-            break;
             
-        case 'kategori':
-            $where = "jenis = 'keluar' AND YEAR(tanggal) = ?";
-            $params = [$tahun];
-            if ($bulan) {
-                $where .= " AND MONTH(tanggal) = ?";
-                $params[] = $bulan;
-            }
-            
-            $stmt = $db->prepare("SELECT 
-                kategori,
-                COUNT(*) as jumlah_transaksi,
-                SUM(jumlah) as total
-                FROM transaksi WHERE $where
-                GROUP BY kategori ORDER BY total DESC");
-            $stmt->execute($params);
-            jsonResponse($stmt->fetchAll());
-            break;
-            
-        case 'bulanan':
-            $stmt = $db->prepare("SELECT 
-                MONTH(tanggal) as bulan,
-                SUM(CASE WHEN jenis = 'masuk' THEN jumlah ELSE 0 END) as pemasukan,
-                SUM(CASE WHEN jenis = 'keluar' THEN jumlah ELSE 0 END) as pengeluaran
-                FROM transaksi WHERE YEAR(tanggal) = ?
-                GROUP BY MONTH(tanggal) ORDER BY bulan");
-            $stmt->execute([$tahun]);
-            jsonResponse($stmt->fetchAll());
-            break;
-            
-        default:
-            jsonResponse(['error' => 'Action tidak valid'], 400);
+            echo json_encode(['success' => true]);
+            exit();
+        }
     }
+    
+    // 404 - Endpoint not found
+    http_response_code(404);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Endpoint not found',
+        'path' => $path,
+        'method' => $method
+    ]);
+    
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => $e->getMessage(),
+        'path' => $path
+    ]);
 }
