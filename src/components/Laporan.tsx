@@ -1,25 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan, formatTanggalIndonesia } from '../utils';
+import { useTransaksi, useSaldo } from '../hooks';
+import { formatRupiah, getPengaturan, formatTanggalIndonesia } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle } from 'docx';
 
 export default function Laporan() {
-  const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
-  const [saldoAwal, setSaldoAwal] = useState<number>(0);
-  const pengaturan = getPengaturan();
+  const { data: transaksi = [], loading: loadingTransaksi } = useTransaksi();
+  const { data: saldo } = useSaldo();
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
   const [filterBulan, setFilterBulan] = useState('');
   const [activeTab, setActiveTab] = useState<'ringkasan' | 'kategori' | 'bulanan'>('ringkasan');
+  const pengaturan = getPengaturan();
 
-  useEffect(() => {
-    setTransaksi(getTransaksi());
-    const saldo = getSaldoAwal();
-    setSaldoAwal(saldo.jumlah);
-  }, []);
+  // Pastikan transaksi selalu array
+  const transaksiArray = Array.isArray(transaksi) ? transaksi : [];
+  const saldoAwal = saldo?.jumlah || 0;
 
-  const filtered = transaksi.filter(t => {
+  const filtered = transaksiArray.filter(t => {
     const date = new Date(t.tanggal);
     const year = date.getFullYear().toString();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -185,26 +184,6 @@ export default function Laporan() {
               ]})),
             ]
           }),
-          new Paragraph({ spacing: { before: 300, after: 200 }, children: [new TextRun({ text: "C. REKAP TRANSAKSI PER BULAN", bold: true, size: 22 })] }),
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [
-              new TableRow({ children: [
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "No", bold: true, size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ children: [new TextRun({ text: "Bulan", bold: true, size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Pemasukan", bold: true, size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Pengeluaran", bold: true, size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Selisih", bold: true, size: 18 })] })] }),
-              ]}),
-              ...Object.entries(monthlyData).sort().map(([bulan, data], i) => new TableRow({ children: [
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(i + 1), size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ children: [new TextRun({ text: new Date(bulan + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }), size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(data.masuk), size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(data.keluar), size: 18 })] })] }),
-                new TableCell({ borders: { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: formatRupiah(data.masuk - data.keluar), size: 18 })] })] }),
-              ]})),
-            ]
-          }),
           new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: `Dibuat pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, size: 20 })] }),
         ]
       }]
@@ -223,6 +202,10 @@ export default function Laporan() {
     { value: '09', label: 'September' }, { value: '10', label: 'Oktober' },
     { value: '11', label: 'November' }, { value: '12', label: 'Desember' },
   ];
+
+  if (loadingTransaksi) {
+    return <div className="text-center py-8">Memuat data laporan...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -294,7 +277,7 @@ export default function Laporan() {
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all" style={{ width: `${Math.min(saldoAwal > 0 ? (totalKeluar / saldoAwal) * 100 : 0, 100)}%` }}></div>
                 </div>
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>Terpakas: {formatRupiah(totalKeluar)}</span>
+                  <span>Terpakai: {formatRupiah(totalKeluar)}</span>
                   <span>Sisa: {formatRupiah(saldoAkhir)}</span>
                 </div>
               </div>

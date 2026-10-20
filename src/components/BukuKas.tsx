@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Transaksi } from '../types';
-import { getTransaksi, getSaldoAwal, formatRupiah, getPengaturan, formatTanggalIndonesia } from '../utils';
+import { useTransaksi, useSaldo } from '../hooks';
+import { formatRupiah, formatTanggalIndonesia, getPengaturan } from '../utils';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
 export default function BukuKas() {
-  const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
-  const [saldoAwal, setSaldoAwal] = useState<number>(0);
+  const { data: transaksi = [], loading: loadingTransaksi } = useTransaksi();
+  const { data: saldo } = useSaldo();
   const [filterBulan, setFilterBulan] = useState('');
-  const pengaturan = getPengaturan();
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
+  const pengaturan = getPengaturan();
 
-  useEffect(() => {
-    setTransaksi(getTransaksi());
-    const saldo = getSaldoAwal();
-    setSaldoAwal(saldo.jumlah);
-  }, []);
+  // Pastikan transaksi selalu array
+  const transaksiArray = Array.isArray(transaksi) ? transaksi : [];
+  const saldoAwal = saldo?.jumlah || 0;
 
-  const filtered = transaksi
+  const filtered = transaksiArray
     .filter(t => {
       const date = new Date(t.tanggal);
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -85,6 +84,10 @@ export default function BukuKas() {
     { value: '11', label: 'November' },
     { value: '12', label: 'Desember' },
   ];
+
+  if (loadingTransaksi) {
+    return <div className="text-center py-8">Memuat data buku kas...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -162,9 +165,9 @@ export default function BukuKas() {
                 </tr>
               ) : (
                 bukuKasData.map((t, i) => (
-                  <tr key={t.id} className={`border-b hover:bg-gray-50 ${t.jenis === 'masuk' ? '' : ''}`}>
+                  <tr key={t.id} className="border-b hover:bg-gray-50">
                     <td className="px-3 py-2 text-center">{i + 1}</td>
-                    <td className="px-3 py-2">{t.tanggal}</td>
+                    <td className="px-3 py-2">{formatTanggalIndonesia(t.tanggal)}</td>
                     <td className="px-3 py-2 font-mono text-xs">{t.noBukti}</td>
                     <td className="px-3 py-2">{t.uraian}</td>
                     <td className="px-3 py-2 text-xs">{t.kodeRekening}</td>
