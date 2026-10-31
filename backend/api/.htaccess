@@ -1,0 +1,30 @@
+# .htaccess untuk API folder
+# Izinkan akses langsung ke file PHP
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /bosp/api/
+    
+    # Izinkan akses langsung ke file yang ada
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+    
+    # Redirect semua request lainnya ke index.php
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+</IfModule>
+
+# PHP settings
+<IfModule mod_php7.c>
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+</IfModule>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Connection Test - BOSP</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e40af;
+            border-bottom: 3px solid #1e40af;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d1fae5;
+            border-color: #10b981;
+        }
+        .error {
+            background: #fee2e2;
+            border-color: #ef4444;
+        }
+        .warning {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        .info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+        button {
+            background: #1e40af;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1e3a8a;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .status.ok {
+            background: #10b981;
+            color: white;
+        }
+        .status.fail {
+            background: #ef4444;
+            color: white;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #ddd;
+            padding-left: 15px;
+        }
+        .checklist li.pass {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        .checklist li.fail {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Database Connection Test</h1>
+        <p>Test koneksi database untuk aplikasi BOSP di <strong>credo.my.id/bosp/</strong></p>
+
+        <div class="test-section info">
+            <h3>📋 Informasi</h3>
+            <p><strong>Base URL:</strong> <code id="baseUrl"></code></p>
+            <p><strong>Current URL:</strong> <code id="currentUrl"></code></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Test Koneksi</h3>
+            <button onclick="testDirectPHP()">Test 1: PHP Direct</button>
+            <button onclick="testDirectDB()">Test 2: Database Direct</button>
+            <button onclick="testAPI()">Test 3: API Router</button>
+            <button onclick="testAll()">Test Semua</button>
+        </div>
+
+        <div id="results"></div>
+
+        <div class="test-section warning">
+            <h3>📋 Checklist Troubleshooting</h3>
+            <ul class="checklist" id="checklist">
+                <li class="fail">1. File backend sudah di-upload ke <code>public_html/bosp/api/</code></li>
+                <li class="fail">2. Database MySQL sudah dibuat di cPanel</li>
+                <li class="fail">3. Schema <code>schema.sql</code> sudah di-import via phpMyAdmin</li>
+                <li class="fail">4. File <code>config.php</code> sudah diisi kredensial database yang benar</li>
+                <li class="fail">5. File <code>.htaccess</code> ada di folder <code>api/</code></li>
+                <li class="fail">6. URL API di <code>src/config.ts</code> sudah benar: <code>/bosp/api</code></li>
+            </ul>
+        </div>
+
+        <div class="test-section info">
+            <h3>📖 Panduan Lengkap</h3>
+            <p>Lihat file <strong>DIAGNOSA_DATABASE.md</strong> untuk panduan troubleshooting lengkap.</p>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = window.location.origin + '/bosp/api';
+        document.getElementById('baseUrl').textContent = baseUrl;
+        document.getElementById('currentUrl').textContent = window.location.href;
+
+        function addResult(title, status, message, details = '') {
+            const resultsDiv = document.getElementById('results');
+            const statusClass = status === 'success' ? 'success' : status === 'warning' ? 'warning' : 'error';
+            const statusIcon = status === 'success' ? '✅' : status === 'warning' ? '⚠️' : '❌';
+            
+            const html = `
+                <div class="test-section ${statusClass}">
+                    <h3>${statusIcon} ${title}</h3>
+                    <p><strong>Status:</strong> <span class="status ${status === 'success' ? 'ok' : 'fail'}">${status}</span></p>
+                    <p><strong>Message:</strong> ${message}</p>
+                    ${details ? `<pre>${details}</pre>` : ''}
+                </div>
+            `;
+            resultsDiv.innerHTML += html;
+        }
+
+        async function testDirectPHP() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek PHP langsung...');
+            
+            try {
+                const response = await fetch(baseUrl + '/direct-test.php');
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'ok') {
+                    addResult(
+                        'PHP Direct Test',
+                        'success',
+                        'PHP bekerja dengan baik',
+                        JSON.stringify(data, null, 2)
+                    );
+                } else {
+                    addResult(
+                        'PHP Direct Test',
+                        'error',
+                        `HTTP ${response.status}: ${response.statusText}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'PHP Direct Test',
+                    'error',
+                    'Gagal terhubung ke server',
+                    `Error: ${error.message}\n\nKemungkinan penyebab:\n1. File direct-test.php belum di-upload\n2. URL API salah\n3. Server tidak berjalan`
+                );
+            }
+        }
+
+        async function testDirectDB() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek koneksi database langsung...');
+            
+            try {
+                const response = await fetch(baseUrl + '/direct-db-test.php');
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'ok') {
+                    addResult(
+                        'Database Direct Test',
+                        'success',
+                        'Database terhubung dengan baik',
+                        JSON.stringify(data, null, 2)
+                    );
+                } else {
+                    addResult(
+                        'Database Direct Test',
+                        'error',
+                        `Error: ${data.message}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'Database Direct Test',
+                    'error',
+                    'Gagal terhubung ke server',
+                    `Error: ${error.message}\n\nKemungkinan penyebab:\n1. File direct-db-test.php belum di-upload\n2. File config.php belum dikonfigurasi\n3. Database belum dibuat`
+                );
+            }
+        }
+
+        async function testAPI() {
+            document.getElementById('results').innerHTML = '';
+            addResult('Testing...', 'info', 'Mengecek API router...');
+            
+            try {
+                const response = await fetch(baseUrl + '/transaksi');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(
+                        'API Router Test',
+                        'success',
+                        `API router bekerja. Ditemukan ${Array.isArray(data) ? data.length : 0} transaksi.`,
+                        JSON.stringify(data, null, 2).substring(0, 1000)
+                    );
+                } else {
+                    addResult(
+                        'API Router Test',
+                        'error',
+                        `HTTP ${response.status}: ${response.statusText}`,
+                        JSON.stringify(data, null, 2)
+                    );
+                }
+            } catch (error) {
+                addResult(
+                    'API Router Test',
+                    'error',
+                    'Gagal terhubung ke API',
+                    `Error: ${error.message}\n\nKemungkinan penyebab:\n1. File index.php belum di-upload\n2. File .htaccess belum ada\n3. Routing tidak bekerja`
+                );
+            }
+        }
+
+        async function testAll() {
+            document.getElementById('results').innerHTML = '';
+            await testDirectPHP();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testDirectDB();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testAPI();
+        }
+    </script>
+</body>
+</html>
