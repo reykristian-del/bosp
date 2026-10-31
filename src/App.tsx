@@ -4,10 +4,11 @@ import Transaksi from './components/Transaksi';
 import BukuKas from './components/BukuKas';
 import BuktiKas from './components/BuktiKas';
 import Laporan from './components/Laporan';
+import Dokumen from './components/Dokumen';
 import Pengaturan from './components/Pengaturan';
 import { getPengaturan } from './utils';
 
-type Page = 'dashboard' | 'transaksi' | 'bukukas' | 'buktikas' | 'laporan' | 'pengaturan';
+type Page = 'dashboard' | 'transaksi' | 'bukukas' | 'buktikas' | 'laporan' | 'dokumen' | 'pengaturan';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -26,6 +27,8 @@ function App() {
         return <BuktiKas />;
       case 'laporan':
         return <Laporan />;
+      case 'dokumen':
+        return <Dokumen />;
       case 'pengaturan':
         return <Pengaturan />;
       default:
@@ -38,6 +41,7 @@ function App() {
     { id: 'transaksi' as Page, label: 'Transaksi', icon: 'fa-money-bill-transfer' },
     { id: 'bukukas' as Page, label: 'Buku Kas', icon: 'fa-book' },
     { id: 'buktikas' as Page, label: 'Bukti Kas', icon: 'fa-file-invoice' },
+    { id: 'dokumen' as Page, label: 'Dokumen', icon: 'fa-file-contract' },
     { id: 'laporan' as Page, label: 'Laporan', icon: 'fa-file-excel' },
     { id: 'pengaturan' as Page, label: 'Pengaturan', icon: 'fa-cog' },
   ];
